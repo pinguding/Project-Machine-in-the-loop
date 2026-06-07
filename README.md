@@ -301,12 +301,22 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 
 ### Install
 
+One line — installs into the current project (`.claude/skills/`), sets up the focus directory, and gitignores `.jarvis/`:
+
 ```bash
-# Put this repo's .claude/skills/* into a project (or ~/.claude/skills/) and it's callable as /jarvis.
-git clone https://github.com/pinguding/Project-Machine-in-the-loop.git
+curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash
 ```
 
-`.jarvis/` is an independent local state per clone, so add it to `.gitignore` (already included in this repo).
+Or clone and run the installer with options:
+
+```bash
+git clone https://github.com/pinguding/Project-Machine-in-the-loop.git
+./Project-Machine-in-the-loop/install.sh            # into the current project
+./Project-Machine-in-the-loop/install.sh <path>     # into a specific project
+./Project-Machine-in-the-loop/install.sh --global   # into ~/.claude/skills/ (every project)
+```
+
+Then open Claude Code in that project and run `/jarvis`. Re-running is safe (idempotent) and updates the skills in place.
 
 ---
 
