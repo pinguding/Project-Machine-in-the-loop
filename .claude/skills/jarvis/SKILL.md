@@ -194,23 +194,28 @@ git diff --name-only <base_head>..<cur_head>   # 커밋 경계로 깨운 경우
 > 이 질문은 "처음 켤 때 한 번"만이다. 강도를 나중에 바꾸려면 `/jarvis strength=<값>`으로 다시 부르면 된다(진행 중인 예약을 덮어쓴다).
 
 ### 1. 측정 (저비용)
-`paths`가 있으면 `-- <paths>`를 붙여서 working tree 변경량을 잰다:
+`paths`가 있으면 `-- <paths>`를 붙여서 working tree 변경량을 잰다. **추적 파일 변경**과 **미추적(새로 생성된) 파일**을 둘 다 센다:
 
 ```bash
-git diff --shortstat HEAD -- [paths]
+git diff --shortstat HEAD -- [paths]                 # ① 추적 파일 변경
+git ls-files --others --exclude-standard -- [paths]  # ② 미추적(새) 파일 목록
 ```
 
-출력에서 `files changed`, `insertions(+)`, `deletions(-)`를 파싱한다.
-- `cur_lines = insertions + deletions`
-- `cur_files = files changed`
-- 출력이 비어 있으면 둘 다 0.
+- ①에서 `files changed`, `insertions(+)`, `deletions(-)`를 파싱한다.
+- ②의 각 파일 라인 수(`wc -l`)와 파일 개수를 더한다.
+- `cur_lines = (① insertions + deletions) + (② 새 파일들의 총 라인 수)`
+- `cur_files = (① files changed) + (② 새 파일 개수)`
+- 둘 다 비어 있으면 0.
 
-`risk`가 설정돼 있으면 위험 경로만 따로 잰다:
+> ⚠️ **왜 ②가 필수인가:** `git diff HEAD`는 **미추적 파일을 포함하지 않는다.** 이게 빠지면 사람이 **새 파일을 손으로 짤 때**(이 프로젝트의 핵심 사용 사례) jarvis가 stage/commit 전까지 0으로 보고 침묵한다. `git add -N`(intent-to-add)로 인덱스에 끌어들이는 방법도 있으나, **인덱스를 변조해 무인 루프에 부작용**을 주므로 쓰지 않는다 — 읽기 전용 `ls-files`로 따로 세어 더한다.
+
+`risk`가 설정돼 있으면 위험 경로만 따로(추적+미추적 동일 방식으로) 잰다:
 
 ```bash
 git diff --shortstat HEAD -- <risk globs>
+git ls-files --others --exclude-standard -- <risk globs>
 ```
-→ `risk_lines = insertions + deletions` (위험 경로 기준). risk 미설정 시 0.
+→ `risk_lines = (추적 ins+del) + (미추적 새 파일 라인 수)` (위험 경로 기준). risk 미설정 시 0.
 
 현재 커밋도 확인한다:
 
@@ -219,7 +224,7 @@ git rev-parse HEAD
 ```
 → `cur_head`.
 
-> 측정은 staged+unstaged 모두 포함하는 working tree 기준(`HEAD` 대비)이다.
+> 측정은 staged·unstaged·**미추적**을 모두 포함하는 working tree 기준(`HEAD` 대비)이다.
 
 ### 2. 경계 판단 (커밋·되돌림 자동 보정)
 `.jarvis/baseline`에서 `base_lines`, `base_files`, `base_risk`, `base_head`를 읽는다.
