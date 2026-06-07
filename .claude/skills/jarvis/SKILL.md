@@ -47,8 +47,8 @@ description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 
 /jarvis strength=high threshold=40                    # 강 프리셋 + threshold만 40으로 덮어쓰기
 /jarvis threshold=40                                  # 40라인 OR 2파일 (strength 미지정 → medium 베이스)
 /jarvis threshold=80 files=3 idle=30m                 # 더 느슨하게
-/jarvis paths=Projects/Musinsa active=3m              # 특정 경로만, 더 촘촘히
-/jarvis risk=**/Payment*.swift,**/*Login*.swift       # 결제·로그인은 분량 무관 즉시 경고
+/jarvis paths=src/billing active=3m                   # 특정 경로만, 더 촘촘히
+/jarvis risk=**/*payment*,**/*auth*                   # 결제·인증은 분량 무관 즉시 경고
 ```
 
 인자 파싱 규칙:
@@ -115,13 +115,9 @@ git diff --name-only <base_head>..<cur_head>   # 커밋 경계로 깨운 경우
 
 그 경로들을 기준으로 다음을 수집한다(존재하는 것만, **이미 컨텍스트에 있으면 재읽기 금지**):
 
-1. **가장 가까운 `AGENTS.md`** — 각 변경 파일의 디렉토리에서 위로 올라가며 처음 만나는 `AGENTS.md`. (예: `Projects/Musinsa/**` 변경 → `Projects/Musinsa/AGENTS.md`)
+1. **가장 가까운 `AGENTS.md`** — 각 변경 파일의 디렉토리에서 위로 올라가며 처음 만나는 `AGENTS.md`. (예: `packages/billing/**` 변경 → `packages/billing/AGENTS.md`)
 2. **디렉토리 `README.md`** — 변경 파일이 위치한 디렉토리에 `README.md`가 있으면 그 파일.
-3. **경로/종류별 `.claude/rules` 매핑** — 변경 파일 종류에 맞는 규칙 문서만 추려서(전부 말고) 참조:
-   - `*Reactor.swift` → `ios/reactorkit-architecture.md`, `ios/state-exposure.md`
-   - `*ViewController.swift` / `*View.swift` / `*Cell.swift` → `ios/ui-development.md`, `core/class-organization.md`
-   - `*ServiceStub.swift` / `Tests/**` → `core/testing-guidelines.md`
-   - `*.swift` 공통 → `core/swift-conventions.md` *(단 자동 주입돼 있으면 생략)*
+3. **변경 파일에 해당하는 `.claude/rules/**` 규칙 문서** — 변경 파일의 종류·경로에 맞는 규칙만 추려서(전부 말고) 참조한다. 프로젝트가 `.claude/rules/`를 어떤 축으로 조직했든(언어별·레이어별·기능별·디렉토리별) 변경된 파일과 가장 관련된 1~3개만 고른다. 규칙 파일명·디렉토리명이 곧 적용 힌트다(예: UI 파일을 바꿨으면 `ui`·`view` 류, 테스트를 바꿨으면 `test` 류, 결제를 바꿨으면 `payment`·`billing` 류). 하드코딩된 언어별 매핑에 기대지 말고 **그 프로젝트가 실제로 가진 규칙 파일에서 발견**한다. 이미 자동 주입된 규칙은 생략한다.
 
 중복·과수집을 피한다: 같은 `AGENTS.md`를 여러 변경 파일이 공유하면 한 번만 읽는다. 수집량이 과하면 변경 파일이 가장 많은 상위 디렉토리 1~2곳으로 한정한다.
 
@@ -288,7 +284,7 @@ git rev-parse HEAD
 - **prompt에는 이번에 받은 args를 그대로 echo 한다.** 그래야 다음 wake에서도 설정이 유지된다. `strength`를 쓴 경우 **전개된 개별 노브가 아니라 `strength=<값>`(+ 개별 덮어쓰기)** 형태로 직렬화한다(강도 의미 보존). 예:
 
   ```
-  /jarvis strength=high paths=Projects/Musinsa risk=**/Payment*.swift
+  /jarvis strength=high paths=src/billing risk=**/*payment*
   /jarvis strength=high threshold=40                      # 프리셋 + 개별 덮어쓰기도 그대로 echo
   /jarvis threshold=50 files=2 active=4m idle=25m debounce=90s   # strength 미사용 시는 개별 노브로 echo
   ```
