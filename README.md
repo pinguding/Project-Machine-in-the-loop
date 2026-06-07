@@ -301,22 +301,29 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 
 ### Install
 
-One line — installs into the current project (`.claude/skills/`), sets up the focus directory, and gitignores `.jarvis/`:
+The installer asks you to **choose a language** (English or Korean skills), then installs into the current
+project (`.claude/skills/`), sets up the focus directory, and gitignores `.jarvis/`.
+
+One line (self-clones from this repo):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash
 ```
 
-Or clone and run the installer with options:
+Or clone and run with options:
 
 ```bash
 git clone https://github.com/pinguding/Project-Machine-in-the-loop.git
-./Project-Machine-in-the-loop/install.sh            # into the current project
-./Project-Machine-in-the-loop/install.sh <path>     # into a specific project
-./Project-Machine-in-the-loop/install.sh --global   # into ~/.claude/skills/ (every project)
+./Project-Machine-in-the-loop/install.sh                  # current project, asks for language
+./Project-Machine-in-the-loop/install.sh --lang en        # English skills, no prompt
+./Project-Machine-in-the-loop/install.sh --lang ko <path> # Korean skills into a specific project
+./Project-Machine-in-the-loop/install.sh --global         # into ~/.claude/skills/ (every project)
 ```
 
 Then open Claude Code in that project and run `/jarvis`. Re-running is safe (idempotent) and updates the skills in place.
+
+> Skill sources live **in the open** under `skills/en/` and `skills/ko/` (not hidden in `.claude/`). The installer
+> copies the language you pick into the target's `.claude/skills/`, which is where Claude Code discovers them.
 
 ---
 

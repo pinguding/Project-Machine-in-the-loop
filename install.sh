@@ -3,22 +3,23 @@
 # jarvis installer — Machine in the Loop
 # https://github.com/pinguding/Project-Machine-in-the-loop
 #
-# 사용법:
-#   ./install.sh                 # 현재 디렉토리(프로젝트)에 설치 → .claude/skills/
-#   ./install.sh ../my-project   # 지정한 프로젝트에 설치
-#   ./install.sh --global        # ~/.claude/skills/ 에 전역 설치 (모든 프로젝트에서 /jarvis)
+# Usage / 사용법:
+#   ./install.sh                      # current project, asks for language
+#   ./install.sh --lang en            # English skills, no prompt
+#   ./install.sh --lang ko ../proj    # Korean skills into ../proj
+#   ./install.sh --global --lang en   # ~/.claude/skills/ (every project)
 #   ./install.sh --help
 #
-# 레포 밖에서 한 줄로:
+# One line from outside the repo (self-clones):
 #   curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash
-#   curl -fsSL .../install.sh | bash -s -- --global
+#   curl -fsSL .../install.sh | bash -s -- --lang en --global
 #
 set -euo pipefail
 
 REPO_URL="https://github.com/pinguding/Project-Machine-in-the-loop.git"
 SKILLS=(jarvis jarvis-once jarvis-pause jarvis-resume jarvis-stop)
 
-# ---- 색 ----
+# ---- colors ----
 if [ -t 1 ]; then B=$'\033[1m'; G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; D=$'\033[2m'; R=$'\033[0m'; else B=; G=; C=; Y=; D=; R=; fi
 say(){ printf '%s\n' "$*"; }
 ok(){  printf '  %s✓%s %s\n' "$G" "$R" "$*"; }
@@ -28,100 +29,120 @@ usage(){
   cat <<EOF
 ${B}jarvis installer${R} — Machine in the Loop
 
-  ${C}./install.sh${R}              현재 디렉토리에 설치 (.claude/skills/)
-  ${C}./install.sh <path>${R}       지정한 프로젝트에 설치
-  ${C}./install.sh --global${R}     ~/.claude/skills/ 전역 설치
+  ${C}./install.sh${R}                     current project (asks for language)
+  ${C}./install.sh <path>${R}              a specific project
+  ${C}./install.sh --global${R}            ~/.claude/skills/ (every project)
+  ${C}./install.sh --lang en|ko${R}        pick skill language (skip the prompt)
   ${C}./install.sh --help${R}
 
-설치되는 스킬: ${SKILLS[*]}
+Installs skills: ${SKILLS[*]}
 EOF
 }
 
-# ---- 인자 파싱 ----
-MODE="project"; TARGET="."
+# ---- args ----
+MODE="project"; TARGET="."; LANGSEL=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    -g|--global) MODE="global"; shift;;
-    -h|--help)   usage; exit 0;;
-    -*)          say "${Y}알 수 없는 옵션: $1${R}"; usage; exit 1;;
-    *)           TARGET="$1"; shift;;
+    -g|--global)   MODE="global"; shift;;
+    -l|--lang)     LANGSEL="${2:-}"; shift 2;;
+    --lang=*)      LANGSEL="${1#*=}"; shift;;
+    --en)          LANGSEL="en"; shift;;
+    --ko)          LANGSEL="ko"; shift;;
+    -h|--help)     usage; exit 0;;
+    -*)            say "${Y}Unknown option: $1${R}"; usage; exit 1;;
+    *)             TARGET="$1"; shift;;
   esac
 done
 
-# ---- 소스 확보 (로컬 레포 or 임시 clone) ----
+# ---- language selection ----
+if [ -z "$LANGSEL" ]; then
+  if [ -e /dev/tty ]; then
+    printf '%s\n' "${B}Choose skill language / 스킬 언어 선택:${R}"
+    printf '  %s1)%s English\n  %s2)%s 한국어\n' "$C" "$R" "$C" "$R"
+    printf '> '
+    read -r choice < /dev/tty || choice=""
+    case "$choice" in 2|ko|KO|한국어|kr) LANGSEL="ko";; *) LANGSEL="en";; esac
+  else
+    LANGSEL="en"
+    info "non-interactive — defaulting to language 'en' (override with --lang ko)"
+  fi
+fi
+case "$LANGSEL" in en|ko) ;; *) say "${Y}Unknown language '$LANGSEL' — use en or ko.${R}"; exit 1;; esac
+
+# ---- source (local repo or temp clone) ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 SRC=""
-if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/.claude/skills/jarvis" ]; then
+if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/skills/$LANGSEL/jarvis" ]; then
   SRC="$SCRIPT_DIR"
-  info "소스: 로컬 레포 ($SRC)"
+  info "source: local repo ($SRC)"
 else
-  command -v git >/dev/null 2>&1 || { say "${Y}git이 필요합니다 (원격 설치 시).${R}"; exit 1; }
+  command -v git >/dev/null 2>&1 || { say "${Y}git is required (for remote install).${R}"; exit 1; }
   TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-  info "소스: 원격에서 clone 중…"
+  info "source: cloning from remote…"
   git clone --depth 1 -q "$REPO_URL" "$TMP/repo"
   SRC="$TMP/repo"
 fi
 
-# ---- 대상 결정 ----
+# ---- destination ----
 if [ "$MODE" = "global" ]; then
   DEST="$HOME/.claude/skills"
   say ""
-  say "${B}전역 설치${R} → ${C}$DEST${R}"
+  say "${B}Global install${R} (${C}$LANGSEL${R}) → ${C}$DEST${R}"
 else
   mkdir -p "$TARGET"
   TARGET="$(cd "$TARGET" && pwd)"
   DEST="$TARGET/.claude/skills"
   say ""
-  say "${B}프로젝트 설치${R} → ${C}$TARGET${R}"
+  say "${B}Project install${R} (${C}$LANGSEL${R}) → ${C}$TARGET${R}"
 fi
 
-# ---- 스킬 복사 ----
+# ---- copy skills ----
 mkdir -p "$DEST"
 for s in "${SKILLS[@]}"; do
   rm -rf "${DEST:?}/$s"
-  cp -R "$SRC/.claude/skills/$s" "$DEST/$s"
+  cp -R "$SRC/skills/$LANGSEL/$s" "$DEST/$s"
   ok "skill: $s"
 done
 
-# ---- 프로젝트 전용: focus 디렉토리 + .gitignore ----
+# ---- project only: focus dir + .gitignore ----
 if [ "$MODE" = "project" ]; then
   FOCUS="$TARGET/.claude/jarvis/focus"
   if [ ! -e "$FOCUS/README.md" ]; then
     mkdir -p "$FOCUS"
-    cp "$SRC/.claude/jarvis/focus/README.md" "$FOCUS/README.md"
-    ok "집중 영역 디렉토리: .claude/jarvis/focus/"
+    cp "$SRC/focus/$LANGSEL/README.md" "$FOCUS/README.md"
+    ok "focus directory: .claude/jarvis/focus/"
   else
-    info "집중 영역 디렉토리 이미 있음 — 보존"
+    info "focus directory already exists — preserved"
   fi
 
   GI="$TARGET/.gitignore"
   if [ ! -f "$GI" ] || ! grep -qE '^\.jarvis/?$' "$GI" 2>/dev/null; then
     printf '\n# jarvis watch-loop local state (per-clone, never committed)\n.jarvis/\n' >> "$GI"
-    ok ".gitignore에 .jarvis/ 추가"
+    ok ".jarvis/ added to .gitignore"
   else
-    info ".gitignore에 .jarvis/ 이미 있음"
+    info ".jarvis/ already in .gitignore"
   fi
 fi
 
-# ---- 안내 ----
+# ---- done ----
 say ""
-say "${G}${B}설치 완료.${R}"
+say "${G}${B}Done.${R}"
 say ""
 if [ "$MODE" = "global" ]; then
-  say "  이제 ${C}아무 프로젝트${R}에서나 ${C}/jarvis${R} 로 워치를 켤 수 있습니다."
+  say "  You can now start the watch with ${C}/jarvis${R} in ${C}any project${R}."
 else
-  say "  설치한 프로젝트에서 Claude Code를 열고 ${C}/jarvis${R} 를 입력하세요."
+  say "  Open Claude Code in that project and run ${C}/jarvis${R}."
 fi
 cat <<EOF
 
-  ${C}/jarvis${R}                    최초 1회 강도를 묻고 워치 시작
-  ${C}/jarvis strength=high${R}      작은 변화도 자주 점검
-  ${C}/jarvis mirror=off${R}         gray zone 거울 끄기
+  ${C}/jarvis${R}                    asks for strength once, then starts the watch
+  ${C}/jarvis strength=high${R}      check small changes often
+  ${C}/jarvis mirror=off${R}         turn off the gray-zone mirror
   ${C}/jarvis-pause${R} ${D}|${R} ${C}-resume${R} ${D}|${R} ${C}-stop${R}
 
-  개인화:
-  ${D}·${R} .claude/skills/jarvis-once/persona.md   내비게이터 성격·집중점 (빈 채로 제공)
-  ${D}·${R} .claude/jarvis/focus/                   이 프로젝트에서 특히 볼 것
+  Personalize:
+  ${D}·${R} .claude/skills/jarvis-once/persona.md   navigator's character & focus (ships empty)
+  ${D}·${R} .claude/jarvis/focus/                   what to watch especially in this project
 
-  키보드는 당신이 잡습니다. 기계가 루프를 돕습니다.
+  You hold the keyboard. The machine works the loop.
 EOF
