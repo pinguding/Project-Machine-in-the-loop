@@ -167,11 +167,12 @@
 
     <div class="eyebrow" style="margin-top:40px">왜 '자비스'인가 · The Name</div>
     <div class="origin mbody">
-      <p>자비스는 토니 스타크의 능력을 <span class="hl">증폭</span>시키지만, 슈트를 조종하고 판단하는 주체는
-        끝까지 토니입니다. 정보를 띄워주고, 결정은 사람이 합니다. 반면 <span class="vs">울트론</span>은 스스로
-        결론을 내리고 독립적으로 행동합니다 — 결국 인간을 의사결정 루프 <span class="danger">밖으로</span> 밀어냅니다.</p>
-      <p>지금의 Coding Agent는 울트론에 가깝습니다. 자동화 수준이 높아서가 아니라,
-        <span class="hl">"내 코드인데 내가 조종석에 없는"</span> 구조를 만들기 때문입니다.</p>
+      <p>자비스는 토니 스타크의 능력을 <span class="hl">증폭</span>시킵니다. 하지만 슈트를 입고 직접
+        <span class="hl">전투를 수행하고 판단하는 주체는 끝까지 토니</span>입니다 — 자비스에게서 정보와 보조를
+        받을 뿐, 조종간을 넘기지 않습니다. 자비스는 옆에서 띄워주고, 결정과 행동은 토니가 합니다.</p>
+      <p>지금의 Coding Agent는 그 반대로 가기 쉽습니다. 자동화 수준이 높아서가 아니라,
+        <span class="hl">"내 코드인데 내가 조종석에 없는"</span> 구조 — 사람을 의사결정 루프
+        <span class="danger">밖으로</span> 밀어내는 구조 — 를 만들기 때문입니다.</p>
       <p class="pull">그래서 이름이 자비스입니다 — 사람을 조종석에 앉혀두는 AI.</p>
     </div>
 
@@ -268,8 +269,8 @@
     </div>
 
     <div class="pull" style="margin-top:18px">
-      <b>리트머스 테스트</b> — 기능을 더할 때마다 묻습니다. ① 이건 자비스다운가, 울트론다운가
-      (사람을 조종석에 더 앉히는가)? ② 토니가 가라고 했나 (상시 허용·위임·금지 중 어디인가)?
+      <b>리트머스 테스트</b> — 기능을 더할 때마다 묻습니다. ① 이건 사람을 조종석에 더 앉히는가,
+      아니면 조종석에서 밀어내는가? ② 토니가 가라고 했나 (상시 허용·위임·금지 중 어디인가)?
       통과 못 하면, 아무리 편리해도 Jarvis가 아닙니다.
     </div>
   </section>
@@ -323,6 +324,15 @@
       <div class="feat"><span class="tag">LOOP</span><span class="ic">♾️</span>
         <h3>단독 자기 반복</h3>
         <p><code>ScheduleWakeup</code>이 반복의 엔진. <code>/loop</code>을 앞에 붙이지 않아도 <b>한 번 호출로 스스로 돈다.</b></p></div>
+      <div class="feat"><span class="tag">PERSONA</span><span class="ic">🎭</span>
+        <h3>내비게이터 개인화</h3>
+        <p>빈 <code>persona.md</code>를 채워 Jarvis가 <b>누구처럼, 무엇에 예민하게</b> 볼지 정한다. 두루뭉술한 보편 맥락이 아니라 내 손에 맞춘 navigation.</p></div>
+      <div class="feat"><span class="tag">FOCUS</span><span class="ic">🔬</span>
+        <h3>집중 영역</h3>
+        <p><code>.claude/jarvis/focus/</code>에 "이 프로젝트에서 특히 봐야 할 것"을 모아두면, 일반 카탈로그보다 <b>우선 렌즈</b>로 본다.</p></div>
+      <div class="feat"><span class="tag">MIRROR</span><span class="ic">🪞</span>
+        <h3>gray zone 거울</h3>
+        <p>누적 변경의 상당 부분이 <b>생성된 코드</b>면 "직접 파악했는지" 한 줄로 비춘다. 막지도 고치지도 않고 거울만 — 책임이 눈 뜨게.</p></div>
     </div>
   </section>
 
@@ -361,6 +371,9 @@
       <tr><td><code>active</code></td><td class="desc">변경 활발 / 리뷰 직후 wake 간격</td><td><span class="def">4m</span></td></tr>
       <tr><td><code>idle</code></td><td class="desc">잠잠할 때 wake 간격</td><td><span class="def">25m</span></td></tr>
       <tr><td><code>paths</code></td><td class="desc">감시 대상 경로 한정</td><td><span class="def">전체</span></td></tr>
+      <tr><td><code>strength</code></td><td class="desc">강도 프리셋 — 위 노브들을 묶어 세팅 (low/medium/high)</td><td><span class="def">medium</span></td></tr>
+      <tr><td><code>focus</code></td><td class="desc">집중 영역 디렉토리 — 우선 렌즈로 보는 문서 모음</td><td><span class="def">.claude/jarvis/focus/</span></td></tr>
+      <tr><td><code>mirror</code></td><td class="desc">gray zone 거울 — 생성 코드 과다 시 한 줄 메모 (비강제)</td><td><span class="def">on</span></td></tr>
     </table>
     <div class="note">
       💡 임계값을 <b>낮춰도 잔소리는 늘지 않습니다.</b> Jarvis는 자체 severity 문턱 아래선
