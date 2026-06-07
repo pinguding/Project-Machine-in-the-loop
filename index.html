@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jarvis · Machine in the Loop</title>
+<style>
+  :root{
+    --bg:#0b0d12; --bg2:#11141c; --card:#161a24; --line:#222838;
+    --txt:#e7ebf3; --dim:#9aa4b8; --faint:#6b7488;
+    --accent:#5b8cff; --accent2:#7c5cff; --gold:#ffd166;
+    --green:#37d39b; --red:#ff6b6b; --amber:#ffb454;
+    --radius:16px; --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Pretendard','Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:radial-gradient(1200px 700px at 80% -10%,rgba(124,92,255,.18),transparent 60%),
+               radial-gradient(900px 600px at 0% 0%,rgba(91,140,255,.14),transparent 55%),
+               var(--bg);
+    color:var(--txt);font-family:var(--sans);line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  section{padding:64px 0;border-bottom:1px solid var(--line)}
+  section:last-child{border-bottom:none}
+
+  /* HERO */
+  .hero{padding:96px 0 72px;text-align:center}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);
+    font-size:13px;color:var(--dim);border:1px solid var(--line);
+    background:rgba(255,255,255,.02);padding:7px 14px;border-radius:999px;margin-bottom:28px}
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--green);
+    box-shadow:0 0 0 4px rgba(55,211,155,.18)}
+  h1{font-size:clamp(40px,7vw,76px);line-height:1.02;letter-spacing:-.03em;font-weight:800}
+  h1 .grad{background:linear-gradient(100deg,var(--accent),var(--accent2) 60%,var(--gold));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{margin-top:22px;font-size:clamp(17px,2.4vw,21px);color:var(--dim);max-width:620px;
+    margin-left:auto;margin-right:auto}
+  .tagline b{color:var(--txt);font-weight:600}
+  .cta{margin-top:36px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .pill{font-family:var(--mono);font-size:14px;padding:11px 18px;border-radius:12px;
+    border:1px solid var(--line);background:var(--card);color:var(--txt)}
+  .pill.key{border-color:rgba(91,140,255,.5);background:linear-gradient(180deg,rgba(91,140,255,.16),rgba(91,140,255,.04))}
+
+  h2{font-size:clamp(26px,4vw,36px);letter-spacing:-.02em;font-weight:750;margin-bottom:10px}
+  .lead{color:var(--dim);font-size:17px;max-width:680px;margin-bottom:34px}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:14px}
+
+  /* PROBLEM / APPROACH split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .col{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+  .col h3{font-size:15px;font-family:var(--mono);margin-bottom:14px;display:flex;align-items:center;gap:9px}
+  .col.bad h3{color:var(--red)} .col.good h3{color:var(--green)}
+  .col p{color:var(--dim);font-size:14.5px}
+  .col .big{font-size:19px;color:var(--txt);font-weight:600;margin-bottom:10px;line-height:1.4}
+
+  /* manifesto */
+  .manifesto{display:flex;flex-direction:column;gap:2px;margin-top:8px}
+  .mblock{display:grid;grid-template-columns:160px 1fr;gap:28px;padding:30px 0;border-top:1px solid var(--line)}
+  .mblock:first-child{border-top:none}
+  .mlabel{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent);padding-top:4px;position:relative}
+  .mlabel .ko{display:block;color:var(--faint);font-size:11px;letter-spacing:.05em;margin-top:6px;text-transform:none}
+  .mbody p{color:var(--dim);font-size:15.5px}
+  .mbody p + p{margin-top:12px}
+  .mbody .hl{color:var(--txt);font-weight:600}
+  .mbody .danger{color:var(--red);font-weight:600}
+  .mbody .ok{color:var(--green);font-weight:600}
+  .mbody .term{font-family:var(--mono);font-size:14px;color:var(--gold);
+    background:rgba(255,209,102,.08);padding:1px 7px;border-radius:5px}
+  .pull{margin:6px 0 0;padding:16px 20px;border-left:3px solid var(--accent2);
+    background:rgba(124,92,255,.06);border-radius:0 10px 10px 0;color:var(--txt);font-size:15px;font-weight:550}
+  @media(max-width:720px){.mblock{grid-template-columns:1fr;gap:10px}}
+  .three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:4px}
+  .three .col{padding:22px}
+  .three .col .big{font-size:16px;margin-bottom:6px}
+  .three .col p{font-family:var(--mono);font-size:13.5px;color:var(--faint)}
+  @media(max-width:720px){.three{grid-template-columns:1fr}}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .feat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:26px;position:relative;overflow:hidden;transition:transform .18s ease,border-color .18s ease}
+  .feat:hover{transform:translateY(-3px);border-color:rgba(124,92,255,.45)}
+  .feat .ic{font-size:24px;margin-bottom:14px;display:block}
+  .feat h3{font-size:18px;margin-bottom:8px;letter-spacing:-.01em}
+  .feat p{color:var(--dim);font-size:14.5px}
+  .feat .tag{position:absolute;top:18px;right:18px;font-family:var(--mono);font-size:10.5px;
+    color:var(--faint);border:1px solid var(--line);padding:3px 8px;border-radius:6px}
+
+  /* flow */
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{display:grid;grid-template-columns:44px 1fr;gap:18px;padding:18px 0;position:relative}
+  .step:not(:last-child)::after{content:"";position:absolute;left:21px;top:50px;bottom:-18px;width:2px;
+    background:linear-gradient(var(--line),transparent)}
+  .num{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:var(--mono);
+    font-weight:700;background:var(--bg2);border:1px solid var(--line);color:var(--accent)}
+  .step .body h3{font-size:16.5px;margin-bottom:4px}
+  .step .body p{color:var(--dim);font-size:14.5px}
+  .step .body code{font-family:var(--mono);font-size:13px;color:var(--gold);
+    background:rgba(255,209,102,.08);padding:2px 6px;border-radius:5px}
+
+  /* code / marker demo */
+  .demo{background:#0e1117;border:1px solid var(--line);border-radius:var(--radius);
+    font-family:var(--mono);font-size:13.5px;padding:22px 24px;overflow-x:auto;color:#cdd6e6}
+  .demo .mk{color:var(--accent2);font-weight:600}
+  .demo .h{color:var(--green)} .demo .w{color:var(--amber)} .demo .d{color:var(--dim)}
+  .demo .tail{color:var(--gold)}
+
+  /* args table */
+  table{width:100%;border-collapse:collapse;font-size:14.5px;
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  th,td{text-align:left;padding:13px 18px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);background:var(--bg2)}
+  tr:last-child td{border-bottom:none}
+  td code{font-family:var(--mono);color:var(--accent);font-size:13px}
+  td .def{font-family:var(--mono);color:var(--gold);font-size:12.5px}
+  td.desc{color:var(--dim)}
+
+  .note{background:linear-gradient(180deg,rgba(124,92,255,.10),rgba(124,92,255,.02));
+    border:1px solid rgba(124,92,255,.3);border-radius:var(--radius);padding:22px 24px;margin-top:24px}
+  .note b{color:var(--txt)}
+
+  /* manifesto quote */
+  .quote{text-align:center;padding:20px 0}
+  .quote p{font-size:clamp(20px,3vw,27px);line-height:1.45;font-weight:600;letter-spacing:-.02em;
+    max-width:760px;margin:0 auto}
+  .quote .src{font-family:var(--mono);color:var(--faint);font-size:13px;margin-top:22px}
+
+  footer{padding:48px 0 72px;text-align:center;color:var(--faint);font-size:13px;font-family:var(--mono)}
+  footer .line{color:var(--gold)}
+
+  @media(max-width:720px){
+    .split,.grid{grid-template-columns:1fr}
+    section{padding:48px 0}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div style="text-align:right;font-family:var(--mono);font-size:13px;padding-top:18px">
+    <span style="color:var(--txt)">English</span>
+    <span style="color:var(--faint)">·</span>
+    <a href="index_kr.html" style="color:var(--dim);text-decoration:none">한국어</a>
+  </div>
+
+  <!-- HERO -->
+  <header class="hero">
+    <span class="badge"><span class="dot"></span> Claude Code Skill · Machine in the Loop</span>
+    <h1>You hold the keyboard.<br><span class="grad">The machine works the loop.</span></h1>
+    <p class="tagline"><b>jarvis</b> is a watch loop that stays at your side while you write code yourself,
+      watching the changes and automatically waking the pair navigator <b>Jarvis</b> only at the moments that matter.
+      The human writes the code; the AI stays an observer.</p>
+    <div class="cta">
+      <span class="pill key">/jarvis</span>
+      <span class="pill">threshold=50</span>
+      <span class="pill">risk=**/*payment*</span>
+      <span class="pill">debounce=90s</span>
+    </div>
+  </header>
+
+  <!-- PHILOSOPHY -->
+  <section>
+    <div class="eyebrow">Why We Built It · The Philosophy</div>
+    <h2>Machine in the Loop</h2>
+    <p class="lead">An approach to AI pair development that preserves authorship. jarvis isn't just an
+      automation tool — it starts from a single stance: <b style="color:var(--txt)">the author of the code must remain the human, all the way through.</b></p>
+
+    <div class="eyebrow" style="margin-top:40px">Why 'Jarvis' · The Name</div>
+    <div class="origin mbody">
+      <p>Jarvis <span class="hl">amplifies</span> Tony Stark's abilities. But the one who suits up,
+        <span class="hl">fights, and makes the calls is always Tony</span> — he takes information and assistance
+        from Jarvis, but he never hands over the controls. Jarvis lifts him up from the side; the decisions and the actions are Tony's.</p>
+      <p>Today's coding agents tend to go the opposite way. Not because automation is too capable, but because they build a
+        <span class="hl">"it's my code, yet I'm not in the cockpit"</span> structure — one that pushes the human
+        <span class="danger">out</span> of the decision loop.</p>
+      <p class="pull">That's why the name is Jarvis — an AI that keeps the human in the cockpit.</p>
+    </div>
+
+    <div class="split" style="margin-bottom:8px">
+      <div class="col bad">
+        <h3>✗ Human in the loop</h3>
+        <div class="big">The AI writes; the human reviews and approves</div>
+        <p>Reviewing as an observer creates <b>false metacognition</b>. Understanding accumulates inside the
+          tool rather than in the person, and errors become already-committed code that someone has to unwind.</p>
+      </div>
+      <div class="col good">
+        <h3>✓ Machine in the loop</h3>
+        <div class="big">The human writes; the machine assists from inside the loop</div>
+        <p>The implementation lives on as <b>long-term memory</b> in the human's hands. The machine stays an observer,
+          pointing the way — but the human holds the keyboard all the way through.</p>
+      </div>
+    </div>
+
+    <div class="manifesto">
+
+      <div class="mblock">
+        <div class="mlabel">Background<span class="ko">배경</span></div>
+        <div class="mbody">
+          <p>As AI full-automation development spreads fast, <span class="hl">the author of code generation is shifting from human to AI.</span>
+            The conventional "Human in the loop" is a structure where the AI produces code and the human
+            reviews and approves it.</p>
+        </div>
+      </div>
+
+      <div class="mblock">
+        <div class="mlabel">Problem<span class="ko">문제</span></div>
+        <div class="mbody">
+          <p>This structure works <span class="hl">against the developer's grasp of the logic.</span>
+            As automation cycles pile up, the developer knows the overall context but loses awareness of the detailed logic.</p>
+          <p>More dangerous still, reviewing as an "observer" rather than an "author" creates the illusion of "knowing" —
+            <span class="danger">false metacognition</span> — and this blind spot
+            accelerates as scale and change grow.</p>
+          <p>A developer who has lost the context drifts toward ever more abstract instructions, and after rounds of
+            ping-pong with the AI the result veers off, so the
+            <span class="hl">cost of starting over compounds.</span></p>
+        </div>
+      </div>
+
+      <div class="mblock">
+        <div class="mlabel">Approach<span class="ko">접근</span></div>
+        <div class="mbody">
+          <p>We flip the roles to build <span class="ok">Machine-in-the-loop</span> instead of Human-in-the-loop.
+            The author of the development is the human, and the machine assists from inside the loop.</p>
+          <p>The human writing the code directly is the founding principle, while the AI continuously observes the logic in progress and offers
+            <span class="term">Review</span> · <span class="term">Navigation</span> ·
+            <span class="term">Warning</span> — but it <span class="hl">intervenes in the code only
+            when the user asks.</span> Otherwise it stays an observer.</p>
+          <p class="pull">Crucially, Navigation offers reference knowledge and patterns, not a finished answer —
+            it shows without spoon-feeding, preserving authorship.</p>
+        </div>
+      </div>
+
+      <div class="mblock">
+        <div class="mlabel">Mechanism<span class="ko">작동 원리</span></div>
+        <div class="mbody">
+          <p>Because the human writes it directly, the implementation's locations and the path through the algorithm remain as
+            <span class="hl">long, concrete long-term memory</span> — the exact opposite of false metacognition.</p>
+          <p>The cost of errors is also <span class="hl">asymmetric.</span> An AI hallucination can simply be ignored by the author, but
+            a full-automation error becomes already-committed code that someone has to find and unwind.
+            <span class="ok">When the human slips, the AI actively leaves a warning.</span></p>
+        </div>
+      </div>
+
+      <div class="mblock">
+        <div class="mlabel">Impact<span class="ko">기대 효과</span></div>
+        <div class="mbody">
+          <p>The developer can focus more on the real work, and <span class="hl">the anxiety over black-boxed logic disappears.</span></p>
+          <p>On speed, it won't turn a day's work into ten minutes — it turns an 8-hour job into 3–4 hours,
+            <span class="hl">but sustains that consistently.</span> Even as scale grows and change accelerates, context
+            forgetting and loss shrink, so we can always give the AI clear instructions.</p>
+          <p class="pull">And the developer can take responsibility for their own code.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="eyebrow" style="margin-top:48px">A Guide, Not a Producer</div>
+    <p class="lead" style="margin-bottom:18px">Jarvis gives the human only three things. What they share is —
+      they're all <b style="color:var(--txt)">guidance</b>, not <b style="color:var(--txt)">production</b>.</p>
+    <div class="three">
+      <div class="col"><div class="big">Flagging what's missing</div><p>"I think this part is left out"</p></div>
+      <div class="col"><div class="big">Suggesting a better approach</div><p>"This logic would be more efficient"</p></div>
+      <div class="col"><div class="big">Pointing to the next step</div><p>"Next, I think you could do this"</p></div>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>The pair-coding roles, exactly as they are.</b> The driver (the human) holds the keyboard and types the code directly — forever the human's seat.
+      The navigator (Jarvis) reviews, looks ahead, and suggests direction. There is only one rule:
+      <b style="color:var(--gold)">"The navigator never takes the keyboard."</b>
+    </div>
+
+    <div class="pull" style="margin-top:18px">
+      <b>The litmus test</b> — with every feature we add, we ask: ① Does this seat the human deeper in the cockpit,
+      or push them out of it? ② Did Tony say to go (is it always-allowed, delegated, or forbidden)?
+      If it doesn't pass, then however convenient it is, it isn't Jarvis.
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section>
+    <div class="eyebrow">How It Works</div>
+    <h2>Watch cheaply, wake only when it's risky</h2>
+    <p class="lead">Polling itself is a single <code style="font-family:var(--mono);color:var(--gold)">git diff</code>,
+      so it barely uses any tokens. The expensive Jarvis review runs only when a threshold, risk, or commit boundary is crossed,
+      <b style="color:var(--txt)">keeping token consumption to a minimum.</b></p>
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <h3>Measure</h3><p>On every wake, gauge the working tree's changed lines and file count, risky-path changes, and the current <code>HEAD</code>. Almost zero tokens.</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <h3>Judge boundaries</h3><p>Was a new commit made? Were changes reverted? Compare against the marker (<code>.git/jarvis-baseline</code>) and auto-correct.</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <h3>Gate + debounce</h3><p>If any one of threshold, risk, or commit boundary is met, it's a review candidate. But <b>if a conversation is underway, hold</b>, then flush the accumulated changes all at once when it settles.</p>
+      </div></div>
+      <div class="step"><div class="num">4</div><div class="body">
+        <h3>Gather conventions → Jarvis</h3><p>Collect the changed files' AGENTS.md, README, and per-path rules, pass them as context, and call Jarvis. The result is wrapped in markers.</p>
+      </div></div>
+      <div class="step"><div class="num">5</div><div class="body">
+        <h3>Schedule the next wake</h3><p>It schedules its own next run with <code>ScheduleWakeup</code>. Self-repeating on its own, with no <code>/loop</code> wrapper.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section>
+    <div class="eyebrow">Core Features</div>
+    <h2>Reacts to risk, not volume</h2>
+    <div class="grid">
+      <div class="feat"><span class="tag">GATE</span><span class="ic">📏</span>
+        <h3>Threshold gate</h3>
+        <p>When changes accumulated since the last review cross the <b>line-count or file-count</b> threshold, it reviews. The AI shows up only after the human has personally written a meaningful amount.</p></div>
+      <div class="feat"><span class="tag">RISK</span><span class="ic">🎯</span>
+        <h3>Risky-path trigger</h3>
+        <p><b>Risky paths</b> like payments and login warn instantly the moment even one line changes, regardless of volume. It never misses the "small but fatal."</p></div>
+      <div class="feat"><span class="tag">COMMIT</span><span class="ic">🔒</span>
+        <h3>Enforced commit-boundary observation</h3>
+        <p>When a new commit is detected, it checks once even below threshold. <b>The moment just before a slip gets sealed into code</b> is the golden time for a warning.</p></div>
+      <div class="feat"><span class="tag">DEBOUNCE</span><span class="ic">⏸️</span>
+        <h3>Conversation debounce</h3>
+        <p>It defers reviews during a live conversation, then delivers the accumulated changes all at once when the conversation settles. <b>It doesn't break your flow.</b></p></div>
+      <div class="feat"><span class="tag">CONTEXT</span><span class="ic">📚</span>
+        <h3>Automatic convention gathering</h3>
+        <p>It gathers the changed files' nearest AGENTS.md, directory README, and per-path team rules and injects them into Jarvis. It reviews knowing even "this package's rules."</p></div>
+      <div class="feat"><span class="tag">LOOP</span><span class="ic">♾️</span>
+        <h3>Standalone self-repetition</h3>
+        <p><code>ScheduleWakeup</code> is the engine of the loop. Without prefixing <code>/loop</code>, <b>one call and it runs on its own.</b></p></div>
+      <div class="feat"><span class="tag">PERSONA</span><span class="ic">🎭</span>
+        <h3>Navigator personalization</h3>
+        <p>Fill in the empty <code>persona.md</code> to set <b>who Jarvis looks like, and what it's sensitive to.</b> Navigation tuned to your own hands, not a vague, universal context.</p></div>
+      <div class="feat"><span class="tag">FOCUS</span><span class="ic">🔬</span>
+        <h3>Focus areas</h3>
+        <p>Collect "what especially deserves attention in this project" under <code>.claude/jarvis/focus/</code>, and it looks through that as a <b>priority lens</b> over the general catalog.</p></div>
+      <div class="feat"><span class="tag">MIRROR</span><span class="ic">🪞</span>
+        <h3>Gray-zone mirror</h3>
+        <p>When a large share of the accumulated changes is <b>generated code</b>, it reflects, in a single line, whether you've actually grasped it. It neither blocks nor fixes — just a mirror, so responsibility opens its eyes.</p></div>
+    </div>
+  </section>
+
+  <!-- MARKER DEMO -->
+  <section>
+    <div class="eyebrow">Transparency</div>
+    <h2>The Jarvis output marker</h2>
+    <p class="lead">An AI-generated review is visually distinct from ordinary conversation. What's between the markers is Jarvis speaking;
+      what's outside is the watch's operational messaging. The closing line reminds you of authorship every time.</p>
+    <div class="demo">
+<span class="d"># Once the conversation settles, the held review flushes</span>
+<span class="mk">╭─🤖 JARVIS ─────────────── (jarvis auto-observation)</span>
+The input may be empty, and <span class="h">checkout.total()</span> references the empty array as-is,
+which could lead to a crash — worth checking this path on empty input.
+<span class="d">· ref: packages/checkout/AGENTS.md (edge-case rules)</span>
+<span class="mk">╰─🤖 JARVIS ─────────────── <span class="tail">You hold the keyboard · the judgment is yours</span></span>
+    </div>
+    <div class="note">
+      <b>It stays an observer.</b> Jarvis doesn't fix the code itself. It only reviews, flags, and suggests the next step, and
+      it switches to implementation <b>only when the human delegates</b> with "go fix this." It neither spoon-feeds the answer
+      nor probes you with a quiz — it <b>flags the concern with a dry memo.</b> To preserve authorship.
+    </div>
+  </section>
+
+  <!-- ARGS -->
+  <section>
+    <div class="eyebrow">Configuration</div>
+    <h2>Tune it in a single line of args</h2>
+    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/jarvis threshold=40 risk=**/*payment* debounce=90s</code></p>
+    <table>
+      <tr><th>Key</th><th>Meaning</th><th>Default</th></tr>
+      <tr><td><code>threshold</code></td><td class="desc">Accumulated changed-line threshold</td><td><span class="def">50</span></td></tr>
+      <tr><td><code>files</code></td><td class="desc">Changed-file threshold (OR'd with lines)</td><td><span class="def">2</span></td></tr>
+      <tr><td><code>risk</code></td><td class="desc">Risky-path glob — warns instantly, regardless of volume</td><td><span class="def">off</span></td></tr>
+      <tr><td><code>debounce</code></td><td class="desc">Quiet time before a conversation is considered settled</td><td><span class="def">90s</span></td></tr>
+      <tr><td><code>active</code></td><td class="desc">Wake interval during active change / right after a review</td><td><span class="def">4m</span></td></tr>
+      <tr><td><code>idle</code></td><td class="desc">Wake interval when things are quiet</td><td><span class="def">25m</span></td></tr>
+      <tr><td><code>paths</code></td><td class="desc">Restrict the watched paths</td><td><span class="def">all</span></td></tr>
+      <tr><td><code>strength</code></td><td class="desc">Strength preset — bundles the knobs above (low/medium/high)</td><td><span class="def">medium</span></td></tr>
+      <tr><td><code>focus</code></td><td class="desc">Focus-area directory — a set of docs viewed as a priority lens</td><td><span class="def">.claude/jarvis/focus/</span></td></tr>
+      <tr><td><code>mirror</code></td><td class="desc">Gray-zone mirror — a one-line memo when generated code runs high (non-enforcing)</td><td><span class="def">on</span></td></tr>
+    </table>
+    <div class="note">
+      💡 <b>Lowering the threshold doesn't add nagging.</b> Because Jarvis falls silent on its own below its own severity bar,
+      a low threshold only adds call cost — it makes no noise.
+      If you want higher risk sensitivity, lower it without worry.
+    </div>
+  </section>
+
+  <!-- CLOSING -->
+  <section>
+    <div class="eyebrow" style="text-align:center">The Closing Question</div>
+    <div class="quote">
+      <p>“During the few hours an AI service is down,<br>should our work be down too?”</p>
+      <p style="color:var(--dim);font-size:16px;font-weight:400;max-width:680px;margin:24px auto 0">
+        The deeper we lean on full automation, the more those few hours leave us <b style="color:var(--txt)">unable to do anything</b> —
+        because the understanding has accumulated inside the tool rather than in the person. For our hands to keep moving, unshaken, even when the tool briefly disappears,
+        shouldn't our understanding of the code accumulate <b style="color:var(--gold)">more inside us than inside the tool?</b></p>
+      <p class="src">jarvis is one answer to that question.</p>
+    </div>
+  </section>
+
+  <footer>
+    jarvis · <span class="line">Machine in the Loop</span><br>
+    Claude Code Skill — .claude/skills/jarvis/  ·  navigator: jarvis-once<br>
+    <span style="color:var(--faint)">Licensed under <a href="LICENSE" style="color:var(--faint)">CC BY 4.0</a> · © 2026 pinguding</span>
+  </footer>
+
+</div>
+</body>
+</html>
