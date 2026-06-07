@@ -1,0 +1,5 @@
+# jarvis watch-loop local state — per-clone, never committed
+.jarvis/
+
+# OS cruft
+.DS_Store
