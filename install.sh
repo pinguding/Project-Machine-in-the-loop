@@ -8,11 +8,13 @@
 #   ./install.sh --lang en            # English skills, no prompt
 #   ./install.sh --lang ko ../proj    # Korean skills into ../proj
 #   ./install.sh --global --lang en   # ~/.claude/skills/ (every project)
+#   ./install.sh --version 1.0.0      # install a specific tag/branch/commit
 #   ./install.sh --help
 #
 # One line from outside the repo (self-clones):
 #   curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash
 #   curl -fsSL .../install.sh | bash -s -- --lang en --global
+#   curl -fsSL .../install.sh | bash -s -- --version 1.0.0
 #
 set -euo pipefail
 
@@ -33,24 +35,30 @@ ${B}jarvis installer${R} — Machine in the Loop
   ${C}./install.sh <path>${R}              a specific project
   ${C}./install.sh --global${R}            ~/.claude/skills/ (every project)
   ${C}./install.sh --lang en|ko${R}        pick skill language (skip the prompt)
+  ${C}./install.sh --version <ref>${R}     install a specific tag, branch, or commit
   ${C}./install.sh --help${R}
+
+  ${D}<ref> is any git tag (e.g. 1.0.0), branch (main), or commit SHA.${R}
+  ${D}Specifying a version always fetches it from the remote.${R}
 
 Installs skills: ${SKILLS[*]}
 EOF
 }
 
 # ---- args ----
-MODE="project"; TARGET="."; LANGSEL=""
+MODE="project"; TARGET="."; LANGSEL=""; VERSION=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    -g|--global)   MODE="global"; shift;;
-    -l|--lang)     LANGSEL="${2:-}"; shift 2;;
-    --lang=*)      LANGSEL="${1#*=}"; shift;;
-    --en)          LANGSEL="en"; shift;;
-    --ko)          LANGSEL="ko"; shift;;
-    -h|--help)     usage; exit 0;;
-    -*)            say "${Y}Unknown option: $1${R}"; usage; exit 1;;
-    *)             TARGET="$1"; shift;;
+    -g|--global)        MODE="global"; shift;;
+    -l|--lang)          LANGSEL="${2:-}"; shift 2;;
+    --lang=*)           LANGSEL="${1#*=}"; shift;;
+    --en)               LANGSEL="en"; shift;;
+    --ko)               LANGSEL="ko"; shift;;
+    -v|--version|--ref) VERSION="${2:-}"; shift 2;;
+    --version=*|--ref=*) VERSION="${1#*=}"; shift;;
+    -h|--help)          usage; exit 0;;
+    -*)                 say "${Y}Unknown option: $1${R}"; usage; exit 1;;
+    *)                  TARGET="$1"; shift;;
   esac
 done
 
@@ -70,30 +78,46 @@ fi
 case "$LANGSEL" in en|ko) ;; *) say "${Y}Unknown language '$LANGSEL' — use en or ko.${R}"; exit 1;; esac
 
 # ---- source (local repo or temp clone) ----
+# A pinned --version always fetches from the remote so the exact ref is used
+# (and the user's local working tree is never checked out / mutated).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 SRC=""
-if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/skills/$LANGSEL/jarvis" ]; then
+if [ -z "$VERSION" ] && [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/skills/$LANGSEL/jarvis" ]; then
   SRC="$SCRIPT_DIR"
   info "source: local repo ($SRC)"
 else
   command -v git >/dev/null 2>&1 || { say "${Y}git is required (for remote install).${R}"; exit 1; }
   TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-  info "source: cloning from remote…"
-  git clone --depth 1 -q "$REPO_URL" "$TMP/repo"
+  if [ -n "$VERSION" ]; then
+    info "source: cloning ${C}$VERSION${R}${D} from remote…"
+    # Fast path works for tags & branches; fall back to a full clone + checkout
+    # so a raw commit SHA also works.
+    if ! git clone --depth 1 --branch "$VERSION" -q "$REPO_URL" "$TMP/repo" 2>/dev/null; then
+      git clone -q "$REPO_URL" "$TMP/repo" || { say "${Y}Clone failed.${R}"; exit 1; }
+      git -C "$TMP/repo" checkout -q "$VERSION" 2>/dev/null \
+        || { say "${Y}Version '$VERSION' not found (not a tag, branch, or commit).${R}"; exit 1; }
+    fi
+  else
+    info "source: cloning from remote…"
+    git clone --depth 1 -q "$REPO_URL" "$TMP/repo"
+  fi
   SRC="$TMP/repo"
+  [ -d "$SRC/skills/$LANGSEL/jarvis" ] \
+    || { say "${Y}This version has no skills/$LANGSEL — try another version or --lang.${R}"; exit 1; }
 fi
 
 # ---- destination ----
+VERLABEL=""; [ -n "$VERSION" ] && VERLABEL=" ${D}@${R} ${C}$VERSION${R}"
 if [ "$MODE" = "global" ]; then
   DEST="$HOME/.claude/skills"
   say ""
-  say "${B}Global install${R} (${C}$LANGSEL${R}) → ${C}$DEST${R}"
+  say "${B}Global install${R} (${C}$LANGSEL${R})${VERLABEL} → ${C}$DEST${R}"
 else
   mkdir -p "$TARGET"
   TARGET="$(cd "$TARGET" && pwd)"
   DEST="$TARGET/.claude/skills"
   say ""
-  say "${B}Project install${R} (${C}$LANGSEL${R}) → ${C}$TARGET${R}"
+  say "${B}Project install${R} (${C}$LANGSEL${R})${VERLABEL} → ${C}$TARGET${R}"
 fi
 
 # ---- copy skills ----
