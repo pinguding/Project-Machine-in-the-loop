@@ -23,163 +23,46 @@ The human writes the code; the AI stays an observer.
 
 ---
 
-## The Philosophy
+## Quick Start
 
-A way of pair-developing with AI that **preserves authorship**. jarvis is not just an
-automation tool; it starts from a single stance — **the author of the code must remain the human, all the way through.**
+**1. Install** into your project (the installer asks you to pick a language — English / Korean):
 
-This is not a retreat to the pre-agent era. It is a call to **redefine AX (AI Experience) around the human.**
-Not turning back the clock — turning the wheel.
-
-### Why "jarvis" · The Name
-
-Jarvis **amplifies** Tony Stark's ability. But the one who actually wears the suit, **fights, and
-makes the call is Tony, to the end** — he receives information and assistance from Jarvis, but never
-hands over the controls. Jarvis surfaces things on the side; the decisions and the actions are Tony's.
-
-Today's coding agents drift the other way easily — not because the automation is too capable, but
-because they build the structure of **"it's my code, yet I'm not in the cockpit"** — a structure that
-pushes the human *out* of the decision loop.
-
-> That's why the name is Jarvis — **the AI that keeps the human in the cockpit.**
-
-### Human in the loop ✗ vs Machine in the loop ✓
-
-|  | **✗ Human in the loop** | **✓ Machine in the loop** |
-|---|---|---|
-| Structure | The AI writes, the human reviews & approves | The human writes, the machine assists inside the loop |
-| Result | Review-as-observer breeds **false metacognition**. Understanding accumulates in the tool, not the human, and errors become already-committed code someone must later dismantle. | The implementation stays in the human's hands as **long-term memory**. The machine remains an observer and guides the way, but the human holds the keyboard to the end. |
-
-The crux is **flipping ownership of the loop**. A human stepping into an AI-made loop to "review" is,
-cognitively, the easiest game to lose — so instead the human owns the loop, and the machine assists inside it.
-
----
-
-### Diagnosis — the failure path of full automation
-
-When performance fell short of expectations, the industry's prescription became *"inject refined context →
-engineer your prompts → context, context, more context,"* and AI-native shops hardened that into the
-structure **"the human doesn't write code, just supplies detailed context."** The disease that structure breeds:
-
-- A bug appears, but the developer **can't tell what to fix** → runs straight to the AI: "fix this for me."
-- Simple errors don't show, but for **multi-layered, compound causes** the AI can't grasp it and the human grasps it even less → resolution time explodes.
-- You can spit out eight features in a snap, yet **never reach minimum shippable quality.** Generation speed isn't throughput — the bottleneck moved to *comprehension and debugging*, and that muscle has gone slack.
-- In the end the human **loses the initiative.** They don't know the code; not writing it, their "feel" dulls; and **juniors are robbed of the chance to grow.**
-
-The dividing line isn't *"to use AI or not."* It's **"does the human hold the command — the judgment of *what* to delegate?"**
-Having the AI generate boilerplate is no problem. But trying to automate *that judgment itself* with a "universal rule"
-is full of paradox — it hands the very initiative of deciding-what-to-delegate back to the machine.
-The human must remain the **router / classifier** to the end.
-
-### gray zone — another name for false metacognition
-
-**gray zone = the region you don't actually know, yet are (self-)judged to know.**
-
-- **Generation** lays down the "where it lives + the algorithmic process" as **episodic memory** — long and concrete.
-- **Reading (review)** leaves only **recognition-level familiarity**, which then masquerades as "understanding."
-  The illusion of "I skimmed it, so I know it" — even the illusion of authorship: "it feels like I made this."
-
-The more full automation accumulates, the wider this gray zone grows. That's why lifting the human's cognition
-back up is what creates sustainability — one of jarvis's strongest pillars.
-
-### Sustainability — not "speed" but "integrated speed"
-
-```
-speed
- │      ╱‾‾╲          ← full automation: an early burst (a day → ten minutes)
- │     ╱    ╲___        but the gray zone widens and velocity collapses
- │    ╱         ╲__     (the wall of "built eight features, none ship-quality")
- │   ╱
- │  ╱━━━━━━━━━━━━━━━  ← Machine in the loop: a lower peak (8h → 4h) held flat
- │ ╱                    the gray zone stays bounded, so it doesn't cave in
- └────────────────────▶ time
+```bash
+curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash
 ```
 
-Full automation's speed is **a loan at compound interest.** As fast as you go now, the gray zone widens, and
-you repay it — with interest — in maintenance and rework ("start over from scratch"). Machine in the loop has a
-lower peak but **takes on no debt.** Measured as *integrated speed (cumulative throughput)* rather than instantaneous
-speed, this side wins.
+**2. Restart Claude Code** — hooks and the status line load at session start.
 
-### The asymmetry of error cost — is the human in the filter seat?
-
-The same **3% hallucination** acts in opposite directions across the two structures.
-
-- **3% under full automation:** the hallucination is sealed straight into the final artifact. The human didn't write it (false metacognition), isn't even positioned to filter it, and that 3% becomes committed code someone must later find and dismantle. Every automation cycle compounds the drift. → **Catastrophic.**
-- **3% in the navigator (jarvis):** the same 3% is merely noise riding on **97% accurate navigation.** Here **the human sits in the filter seat.** If the AI talks nonsense, you **cleanly ignore it and get on with your work.** Discard cost ≈ 0, and only human-written code lands in the artifact. → **Harmless — net positive, even.**
-
-The real axis dividing the two structures is **whether the human occupies the filter seat.**
-
-> **The kill-shot, against "better models will solve it":**
-> A better AI doesn't shrink the gray zone — it **widens** it. The more plausible and correct the code looks, the
-> *more convincingly* the "I know this" illusion takes hold. Sloppy code at least invites suspicion; flawless-looking
-> code kills the urge to verify outright. So the gray zone is **immune to model improvement** — this argument's weight
-> rests not on the contingent "3% hallucination" but on the permanent **structure of human cognition.**
-
-### Accountability cannot be delegated
-
-So what if, between wakes, the human has the AI write everything and only takes the review? — **that, too, is the
-human's call.** jarvis does not force it. The moment it forces anything, it is taking the choice away from the human.
-
-Instead, the real gate isn't a tool's teeth — it's **accountability.**
-
-> Labor can be delegated. But **accountability cannot.**
-> The moment your name is on the commit, it is something you must answer for.
-
-People **don't sign their name to what they don't understand.** The instant accountability becomes non-delegable,
-the human is pulled back to the keyboard on their own. This is the *structural* gravity that stands in for jarvis's
-missing teeth.
-
-You might call this "an irresponsible design that offloads onto individual discipline" — but it's the **opposite.**
-What *diffuses* responsibility is full automation ("but the AI wrote it"); Machine in the loop **concentrates** it on
-one person ("your name, your commit"). It puts *more* responsibility on the human, not less.
-
-> **The precondition (stated honestly):** all of this presupposes a culture where the name on a commit actually means
-> something (real code review, you fix your own bugs, on-call). Where accountability is diffuse, no tool can substitute
-> for it — but that is a different, already-severed-feedback-loop problem.
-
-### The mirror — so accountability isn't blinded by the gray zone
-
-For accountability to pull the human in, the human must **know that they don't know.** But the very essence of the
-gray zone is "not knowing while feeling that you know." So accountability alone can fall short.
-
-The mirror fills that gap — not as force, but as **light that makes accountability honest.** When a large share of the
-accrued change is *generated code*, jarvis neither blocks nor fixes; it just holds up one line:
+**3. Start the watch:**
 
 ```
-🪞 Much of this change looks generated this session — it'll ship under your name; confirm you actually grasp it.
+/loop /jarvis
 ```
 
-Without taking the keyboard, it lets the one who signs **sign with their eyes open.** (Turn it off with `mirror=off` —
-even the mirror is non-coercive.)
+That's it. The first run asks you for a strength once, then jarvis watches your changes while
+*you* write the code, and wakes a pair-navigator only when it matters — new change has accrued,
+a risk path was touched, or a commit boundary was crossed. **It never edits your code.**
 
-### A guide, not a producer
+**Common variations:**
 
-What Jarvis gives the human is only three things. What they share — all are **guidance**, not **production.**
+```
+/loop /jarvis strength=high        # check small changes often
+/loop /jarvis strength=low         # only big chunks, rarely
+/loop /jarvis risk=**/*payment*    # risk paths warn immediately, any size
+/loop /jarvis mirror=off           # turn off the gray-zone mirror (on by default)
+```
 
-| Point out what's missing | Suggest a better approach | Show the next step |
-|---|---|---|
-| "this part seems left out" | "this logic would be more efficient" | "next, you could do this" |
+| Action | How |
+|---|---|
+| **Stop / pause** | interrupt the loop (Esc) |
+| **Resume** | `/loop /jarvis` again (restores saved settings) |
+| **Full reset** | `/jarvis-reset` |
 
-**Exactly the roles of pair coding.** The driver (the human) holds the keyboard and writes the code — forever the
-human's seat. The navigator (Jarvis) reviews, looks ahead, and suggests direction. The single rule:
-**"the navigator never takes the keyboard."**
+> ⚠️ Launch as `/loop /jarvis` with **no interval**. `/loop 5m /jarvis` runs on a fixed schedule and
+> ignores jarvis's own `active`/`idle`/`strength` pacing. → see [Configuration](#configuration--tune-with-one-line-of-args) for the full args, and [Install](#install) for `--lang` / `--global` / clone options.
 
-### The navigator's register — flag it and step back
-
-The navigator flags things with a **dry memo.** It neither spoon-feeds (answers, directives) nor quizzes (questions,
-tests) — both seat the human as a passive responder. It marks the concern with a "needs checking" and steps back.
-If you don't know, *you* go find out (by any means — AI or not; the human decides).
-
-- ❌ Spoon-feed: *"line 40 is missing a null check, fix it like this"*
-- ❌ Quiz: *"did you think about what happens when the input is empty?"*
-- ✅ Memo: *"input could be empty here — this case needs checking"*
-
-> **It helps you sit down at the desk; it does not read the book for you.**
-
-### The litmus test
-
-For every feature you add, you ask: ① Does this seat the human *more* firmly in the cockpit, or push them *out* of it?
-② Did Tony say go (always-allowed · delegated · forbidden — which one)? If it doesn't pass, it isn't Jarvis, however convenient.
+New to the idea — or wondering *why* it's built to keep you at the keyboard instead of automating you
+out of the loop? → [**The Philosophy**](#the-philosophy)
 
 ---
 
@@ -360,6 +243,164 @@ Then open Claude Code in that project and run `/loop /jarvis`. Re-running the in
 
 > Skill sources live **in the open** under `skills/en/` and `skills/ko/` (not hidden in `.claude/`). The installer
 > copies the language you pick into the target's `.claude/skills/`, which is where Claude Code discovers them.
+
+---
+
+## The Philosophy
+
+A way of pair-developing with AI that **preserves authorship**. jarvis is not just an
+automation tool; it starts from a single stance — **the author of the code must remain the human, all the way through.**
+
+This is not a retreat to the pre-agent era. It is a call to **redefine AX (AI Experience) around the human.**
+Not turning back the clock — turning the wheel.
+
+### Why "jarvis" · The Name
+
+Jarvis **amplifies** Tony Stark's ability. But the one who actually wears the suit, **fights, and
+makes the call is Tony, to the end** — he receives information and assistance from Jarvis, but never
+hands over the controls. Jarvis surfaces things on the side; the decisions and the actions are Tony's.
+
+Today's coding agents drift the other way easily — not because the automation is too capable, but
+because they build the structure of **"it's my code, yet I'm not in the cockpit"** — a structure that
+pushes the human *out* of the decision loop.
+
+> That's why the name is Jarvis — **the AI that keeps the human in the cockpit.**
+
+### Human in the loop ✗ vs Machine in the loop ✓
+
+|  | **✗ Human in the loop** | **✓ Machine in the loop** |
+|---|---|---|
+| Structure | The AI writes, the human reviews & approves | The human writes, the machine assists inside the loop |
+| Result | Review-as-observer breeds **false metacognition**. Understanding accumulates in the tool, not the human, and errors become already-committed code someone must later dismantle. | The implementation stays in the human's hands as **long-term memory**. The machine remains an observer and guides the way, but the human holds the keyboard to the end. |
+
+The crux is **flipping ownership of the loop**. A human stepping into an AI-made loop to "review" is,
+cognitively, the easiest game to lose — so instead the human owns the loop, and the machine assists inside it.
+
+### Diagnosis — the failure path of full automation
+
+When performance fell short of expectations, the industry's prescription became *"inject refined context →
+engineer your prompts → context, context, more context,"* and AI-native shops hardened that into the
+structure **"the human doesn't write code, just supplies detailed context."** The disease that structure breeds:
+
+- A bug appears, but the developer **can't tell what to fix** → runs straight to the AI: "fix this for me."
+- Simple errors don't show, but for **multi-layered, compound causes** the AI can't grasp it and the human grasps it even less → resolution time explodes.
+- You can spit out eight features in a snap, yet **never reach minimum shippable quality.** Generation speed isn't throughput — the bottleneck moved to *comprehension and debugging*, and that muscle has gone slack.
+- In the end the human **loses the initiative.** They don't know the code; not writing it, their "feel" dulls; and **juniors are robbed of the chance to grow.**
+
+The dividing line isn't *"to use AI or not."* It's **"does the human hold the command — the judgment of *what* to delegate?"**
+Having the AI generate boilerplate is no problem. But trying to automate *that judgment itself* with a "universal rule"
+is full of paradox — it hands the very initiative of deciding-what-to-delegate back to the machine.
+The human must remain the **router / classifier** to the end.
+
+### gray zone — another name for false metacognition
+
+**gray zone = the region you don't actually know, yet are (self-)judged to know.**
+
+- **Generation** lays down the "where it lives + the algorithmic process" as **episodic memory** — long and concrete.
+- **Reading (review)** leaves only **recognition-level familiarity**, which then masquerades as "understanding."
+  The illusion of "I skimmed it, so I know it" — even the illusion of authorship: "it feels like I made this."
+
+The more full automation accumulates, the wider this gray zone grows. That's why lifting the human's cognition
+back up is what creates sustainability — one of jarvis's strongest pillars.
+
+### Sustainability — not "speed" but "integrated speed"
+
+```
+speed
+ │      ╱‾‾╲          ← full automation: an early burst (a day → ten minutes)
+ │     ╱    ╲___        but the gray zone widens and velocity collapses
+ │    ╱         ╲__     (the wall of "built eight features, none ship-quality")
+ │   ╱
+ │  ╱━━━━━━━━━━━━━━━  ← Machine in the loop: a lower peak (8h → 4h) held flat
+ │ ╱                    the gray zone stays bounded, so it doesn't cave in
+ └────────────────────▶ time
+```
+
+Full automation's speed is **a loan at compound interest.** As fast as you go now, the gray zone widens, and
+you repay it — with interest — in maintenance and rework ("start over from scratch"). Machine in the loop has a
+lower peak but **takes on no debt.** Measured as *integrated speed (cumulative throughput)* rather than instantaneous
+speed, this side wins.
+
+### The asymmetry of error cost — is the human in the filter seat?
+
+The same **3% hallucination** acts in opposite directions across the two structures.
+
+- **3% under full automation:** the hallucination is sealed straight into the final artifact. The human didn't write it (false metacognition), isn't even positioned to filter it, and that 3% becomes committed code someone must later find and dismantle. Every automation cycle compounds the drift. → **Catastrophic.**
+- **3% in the navigator (jarvis):** the same 3% is merely noise riding on **97% accurate navigation.** Here **the human sits in the filter seat.** If the AI talks nonsense, you **cleanly ignore it and get on with your work.** Discard cost ≈ 0, and only human-written code lands in the artifact. → **Harmless — net positive, even.**
+
+The real axis dividing the two structures is **whether the human occupies the filter seat.**
+
+> **The kill-shot, against "better models will solve it":**
+> A better AI doesn't shrink the gray zone — it **widens** it. The more plausible and correct the code looks, the
+> *more convincingly* the "I know this" illusion takes hold. Sloppy code at least invites suspicion; flawless-looking
+> code kills the urge to verify outright. So the gray zone is **immune to model improvement** — this argument's weight
+> rests not on the contingent "3% hallucination" but on the permanent **structure of human cognition.**
+
+### Accountability cannot be delegated
+
+So what if, between wakes, the human has the AI write everything and only takes the review? — **that, too, is the
+human's call.** jarvis does not force it. The moment it forces anything, it is taking the choice away from the human.
+
+Instead, the real gate isn't a tool's teeth — it's **accountability.**
+
+> Labor can be delegated. But **accountability cannot.**
+> The moment your name is on the commit, it is something you must answer for.
+
+People **don't sign their name to what they don't understand.** The instant accountability becomes non-delegable,
+the human is pulled back to the keyboard on their own. This is the *structural* gravity that stands in for jarvis's
+missing teeth.
+
+You might call this "an irresponsible design that offloads onto individual discipline" — but it's the **opposite.**
+What *diffuses* responsibility is full automation ("but the AI wrote it"); Machine in the loop **concentrates** it on
+one person ("your name, your commit"). It puts *more* responsibility on the human, not less.
+
+> **The precondition (stated honestly):** all of this presupposes a culture where the name on a commit actually means
+> something (real code review, you fix your own bugs, on-call). Where accountability is diffuse, no tool can substitute
+> for it — but that is a different, already-severed-feedback-loop problem.
+
+### The mirror — so accountability isn't blinded by the gray zone
+
+For accountability to pull the human in, the human must **know that they don't know.** But the very essence of the
+gray zone is "not knowing while feeling that you know." So accountability alone can fall short.
+
+The mirror fills that gap — not as force, but as **light that makes accountability honest.** When a large share of the
+accrued change is *generated code*, jarvis neither blocks nor fixes; it just holds up one line:
+
+```
+🪞 Much of this change looks generated this session — it'll ship under your name; confirm you actually grasp it.
+```
+
+Without taking the keyboard, it lets the one who signs **sign with their eyes open.** (Turn it off with `mirror=off` —
+even the mirror is non-coercive.)
+
+### A guide, not a producer
+
+What Jarvis gives the human is only three things. What they share — all are **guidance**, not **production.**
+
+| Point out what's missing | Suggest a better approach | Show the next step |
+|---|---|---|
+| "this part seems left out" | "this logic would be more efficient" | "next, you could do this" |
+
+**Exactly the roles of pair coding.** The driver (the human) holds the keyboard and writes the code — forever the
+human's seat. The navigator (Jarvis) reviews, looks ahead, and suggests direction. The single rule:
+**"the navigator never takes the keyboard."**
+
+### The navigator's register — flag it and step back
+
+The navigator flags things with a **dry memo.** It neither spoon-feeds (answers, directives) nor quizzes (questions,
+tests) — both seat the human as a passive responder. It marks the concern with a "needs checking" and steps back.
+If you don't know, *you* go find out (by any means — AI or not; the human decides).
+
+- ❌ Spoon-feed: *"line 40 is missing a null check, fix it like this"*
+- ❌ Quiz: *"did you think about what happens when the input is empty?"*
+- ✅ Memo: *"input could be empty here — this case needs checking"*
+
+> **It helps you sit down at the desk; it does not read the book for you.**
+
+### The litmus test
+
+For every feature you add, you ask: ① Does this seat the human *more* firmly in the cockpit, or push them *out* of it?
+② Did Tony say go (always-allowed · delegated · forbidden — which one)? If it doesn't pass, it isn't Jarvis, however convenient.
 
 ---
 
