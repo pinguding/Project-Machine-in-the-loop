@@ -1,5 +1,11 @@
 # jarvis watch-loop local state — per-clone, never committed
 .jarvis/
 
+# Claude Code harness lock (transient, per-session)
+.claude/scheduled_tasks.lock
+
+# editor swap files
+*.swp
+
 # OS cruft
 .DS_Store

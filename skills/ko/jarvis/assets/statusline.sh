@@ -48,12 +48,19 @@ hum(){
 icon='🤖'
 tail=""; [ -n "$strength" ] && tail=" · ${strength}"
 
+# 이벤트 기반 확정(우선): Stop 훅(loop-watch-hook.sh)이 /jarvis wake 소멸을 감지하면
+# .jarvis/stopped 를 남긴다. 이 플래그가 있으면 시간 추론을 건너뛰고 즉시 "멈춤"을 표시한다.
+if [ -f "$dir/.jarvis/stopped" ]; then
+  printf '%s jarvis · ⚠ Loop 멈춤 (중단됨) — /loop /jarvis 로 재개%s' "$icon" "$tail"
+  exit 0
+fi
+
 if [ -n "${next_wake:-}" ]; then
   remain=$(( next_wake - now ))
   grace=120                       # wake가 조금 늦게 발화하는 여유
   if   [ "$remain" -gt 0 ];            then printf '%s jarvis · 감시 중 · 다음 ~%s (%s)%s' "$icon" "$(hum "$remain")" "${interval:-?}" "$tail"
   elif [ "$remain" -ge $(( -grace )) ]; then printf '%s jarvis · 확인 중…%s' "$icon" "$tail"
-  else                                       printf '%s jarvis · ⚠ 멈춤? %s 동안 tick 없음 — /loop /jarvis 로 재개' "$icon" "$(hum "$remain")"; fi
+  else                                       printf '%s jarvis · ⚠ Loop가 멈추었습니다. %s 동안 tick 없음 — /loop /jarvis 로 재개' "$icon" "$(hum "$remain")"; fi
 else
   printf '%s jarvis · 감시 중%s' "$icon" "$tail"
 fi

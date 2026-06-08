@@ -169,6 +169,33 @@ else
   echo "  ⚠ statusline.sh 없음 — 스킵 ($SL)"
 fi
 
+echo "▸ 12. loop-watch-hook.sh (Stop 훅) — session_crons 기반 이벤트 멈춤 감지"
+# Stop 훅 payload의 session_crons에 /jarvis wake가 없으면 .jarvis/stopped 를 남기고,
+# 있으면 지운다. last_assistant_message에 /jarvis 텍스트가 있어도 오탐 없어야 한다.
+HK="$REPO_DIR/skills/en/jarvis/assets/loop-watch-hook.sh"
+if [ -f "$HK" ]; then
+  printf 'state=watching next_wake=9999999999 interval=active strength=high tick=1\n' > .jarvis/status
+  # (a) /jarvis wake 없음 → stopped 생성
+  printf '{"hook_event_name":"Stop","cwd":"%s","session_crons":[],"last_assistant_message":"talking about /jarvis"}' "$SANDBOX" | bash "$HK"
+  ok "$([ -f .jarvis/stopped ] && echo 1 || echo 0)" 1 "wake 없음 → .jarvis/stopped 생성"
+  # statusline이 플래그를 우선 인식 → 즉시 stopped (next_wake가 먼 미래여도)
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'stopped' "$out")" 1 "stopped 플래그 → statusline 즉시 멈춤(시간추론 무시)"
+  # (b) /jarvis wake 있음 → stopped 해제
+  printf '{"hook_event_name":"Stop","cwd":"%s","session_crons":[{"prompt":"/loop /jarvis strength=high"}]}' "$SANDBOX" | bash "$HK"
+  ok "$([ -f .jarvis/stopped ] && echo 1 || echo 0)" 0 "wake 있음 → .jarvis/stopped 해제"
+  # (c) last_assistant_message에만 /jarvis (crons는 비어있음) → 오탐 없이 stopped
+  printf '{"hook_event_name":"Stop","cwd":"%s","session_crons":[{"prompt":"/some-other-loop"}],"last_assistant_message":"/jarvis /jarvis"}' "$SANDBOX" | bash "$HK"
+  ok "$([ -f .jarvis/stopped ] && echo 1 || echo 0)" 1 "메시지 텍스트 /jarvis 오탐 없음(crons만 판정)"
+  # (d) session_crons 필드 없음 → unknown(손대지 않음)
+  rm -f .jarvis/stopped
+  printf '{"hook_event_name":"Stop","cwd":"%s"}' "$SANDBOX" | bash "$HK"
+  ok "$([ -f .jarvis/stopped ] && echo 1 || echo 0)" 0 "session_crons 없음 → no-op(시간추론에 위임)"
+  rm -f .jarvis/status .jarvis/stopped
+else
+  echo "  ⚠ loop-watch-hook.sh 없음 — 스킵 ($HK)"
+fi
+
 echo ""
 echo "════════════════════════════════════"
 echo "  PASS=$PASS  FAIL=$FAIL"

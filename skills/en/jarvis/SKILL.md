@@ -102,6 +102,7 @@ The watch's progress is controlled by the 2 files below. Both are under `.jarvis
 | `.jarvis/baseline` | The watch baseline in the format above. The core of loop progress state. If it remains on disk, the next `/loop /jarvis` continues watching from that point (= resume). | written every tick / deleted by `/jarvis-reset` |
 | `.jarvis/args` | The effective args string of the previous tick (e.g., `strength=medium`). Updated every tick. If the next start is invoked **with no args**, jarvis reads this value and auto-resumes with the same settings (procedure 0.4). Default (medium) if absent. | written every tick / deleted by `/jarvis-reset` |
 | `.jarvis/status` | **A one-line liveness state** (see "Liveness" below). At the end of every tick it records the next wake time (`next_wake` epoch), interval, and strength. The statusline script reads this file to continuously show "watching / stalled?" **between** ticks. | written every tick / deleted by `/jarvis-reset` |
+| `.jarvis/stopped` | **An event-based "stopped" flag** (see "Liveness (C)"). The Stop hook (`assets/loop-watch-hook.sh`) drops it when a turn ends with no `/jarvis` wakeup pending. If present, the statusline shows "stopped" **instantly** with no time inference; the hook clears it while a wakeup is alive. | written/cleared by the Stop hook / deleted by `/jarvis-reset` |
 
 > **Lifecycle (on top of `/loop`):** Start/resume is `/loop /jarvis` — if baseline/args remain, it continues from that state. Stop/pause is interrupting the `/loop` itself (Esc) — no next wake gets scheduled so the loop ends, and baseline/args stay on disk waiting to resume. Full reset is **`/jarvis-reset`** (an independent skill: delete baseline/args → next start is a first boot). Loop termination has no teardown hook, so state cleanup only happens at start time (self-correction) and via `/jarvis-reset`. (The old `.jarvis/paused` flag and `/jarvis-pause`·`/jarvis-resume`·`/jarvis-stop` are no longer used.)
 
@@ -354,6 +355,7 @@ Call `ScheduleWakeup` to schedule the next run.
   mkdir -p .jarvis
   now=$(date +%s)
   echo "state=watching next_wake=$((now + <delay_s>)) interval=<interval> strength=<strength> tick=$now" > .jarvis/status
+  rm -f .jarvis/stopped   # a tick running = loop alive → clear the event stopped flag (if any)
   ```
 
   This one line is what backs the statusline's continuous display (watching / stalled?) and stall inference (see "Liveness"). Omit it and the statusline sees only a stale `next_wake` and soon shows "stalled?".
@@ -398,6 +400,24 @@ The script ships with this skill: **`assets/statusline.sh`**. If `.jarvis/status
 
 - For a project-scoped install, change the path to `.claude/skills/jarvis/assets/statusline.sh`.
 - If you already use another `statusLine`, Claude Code allows only one, so call `bash .../statusline.sh` from inside your existing script and merge its output as one segment.
+
+### (C) Stop hook — confirm "stopped" instantly, no time inference (optional)
+The (B) statusline can only infer death once `next_wake` has passed, so it lags by up to `interval + grace`. The Stop hook raises that to an **event-based** signal.
+
+Register `assets/loop-watch-hook.sh` as a **Stop** and **StopFailure** hook. At every turn-end it inspects the payload's `session_crons` (the list of currently scheduled wakeups). If no `/jarvis` wakeup is in it, the loop is no longer scheduled (a missed/errored ScheduleWakeup, or an Esc-killed loop followed by any user turn) → it drops `.jarvis/stopped` so the statusline shows "stopped" **instantly**. While a wakeup is alive, it clears the flag.
+
+```json
+{
+  "hooks": {
+    "Stop":        [ { "hooks": [ { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/loop-watch-hook.sh" } ] } ],
+    "StopFailure": [ { "hooks": [ { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/loop-watch-hook.sh" } ] } ]
+  }
+}
+```
+
+- **Timing:** it cannot catch the Esc *moment* — Claude Code has no interrupt hook (Stop fires only on a normal turn-end). It confirms at the **end of the next turn (your next input)** after Esc. You usually interact right away, so it feels near-instant; only "pressed Esc and walked away with no further turn" falls back to (B)'s time inference.
+- **No false positives:** even if "/jarvis" appears in `last_assistant_message`, it's ignored — only wakeup prompts inside `session_crons` are checked.
+- Without the hook, (B) alone still works (time inference). The hook is an optional speed-up of *detection*.
 
 ## Stop / resume / reset
 

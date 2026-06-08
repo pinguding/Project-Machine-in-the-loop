@@ -149,11 +149,13 @@ if [ "$MODE" = "project" ]; then
 fi
 
 # ---- done ----
-# statusline asset path (for the optional liveness indicator hint below)
+# asset paths (for the optional liveness hints below)
 if [ "$MODE" = "global" ]; then
   STATUSLINE='~/.claude/skills/jarvis/assets/statusline.sh'
+  HOOK='~/.claude/skills/jarvis/assets/loop-watch-hook.sh'
 else
   STATUSLINE='.claude/skills/jarvis/assets/statusline.sh'
+  HOOK='.claude/skills/jarvis/assets/loop-watch-hook.sh'
 fi
 
 say ""
@@ -178,6 +180,13 @@ cat <<EOF
   add this to your ${C}settings.json${R} (not changed automatically):
     ${D}"statusLine": { "type": "command", "command": "bash ${STATUSLINE}" }${R}
   ${D}prints nothing when the watch isn't running, so it's safe to leave on.${R}
+
+  Optional — ${B}instant "stopped" detection${R} (event-based, no time lag) via a Stop hook:
+    ${D}"hooks": {${R}
+    ${D}  "Stop":        [ { "hooks": [ { "type": "command", "command": "bash ${HOOK}" } ] } ],${R}
+    ${D}  "StopFailure": [ { "hooks": [ { "type": "command", "command": "bash ${HOOK}" } ] } ]${R}
+    ${D}}${R}
+  ${D}flags the watch stopped the moment a turn ends with no /jarvis wakeup pending.${R}
 
   Personalize:
   ${D}·${R} .claude/skills/jarvis-once/persona.md   navigator's character & focus (ships empty)

@@ -49,6 +49,13 @@ hum(){
 icon='🤖'
 tail=""; [ -n "$strength" ] && tail=" · ${strength}"
 
+# Event-based confirmation (priority): the Stop hook (loop-watch-hook.sh) drops .jarvis/stopped
+# the moment the /jarvis wakeup is gone. If present, skip time inference and show "stopped" now.
+if [ -f "$dir/.jarvis/stopped" ]; then
+  printf '%s jarvis · ⚠ loop stopped — /loop /jarvis to resume%s' "$icon" "$tail"
+  exit 0
+fi
+
 if [ -n "${next_wake:-}" ]; then
   remain=$(( next_wake - now ))
   grace=120                       # slack for a wake that fires a bit late
