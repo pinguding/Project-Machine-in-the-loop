@@ -181,7 +181,59 @@
         <span class="danger">out</span> of the decision loop.</p>
       <p class="pull">That's why the name is Jarvis — an AI that keeps the human in the cockpit.</p>
     </div>
+  </section>
 
+  <!-- QUICK START -->
+  <section>
+    <div class="eyebrow">Get Started · Quick Start</div>
+    <h2>Up and watching in three steps</h2>
+    <p class="lead">Install, restart, launch. The first run asks you for a strength once — then jarvis watches your
+      changes while <b style="color:var(--txt)">you</b> write the code, and wakes a pair-navigator only when it matters.
+      <b style="color:var(--txt)">It never edits your code.</b></p>
+
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <h3>Install into your project</h3>
+        <p>The installer asks you to pick a language — English / Korean.</p>
+        <div class="demo" style="margin-top:12px;white-space:pre-wrap">curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash</div>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <h3>Restart Claude Code</h3>
+        <p>Hooks and the status line load at session start.</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <h3>Start the watch</h3>
+        <div class="demo" style="margin-top:12px"><span class="tail">/loop /jarvis</span></div>
+        <p style="margin-top:10px">That's it. Jarvis wakes only when new change has accrued, a risk path was touched,
+          or a commit boundary was crossed.</p>
+      </div></div>
+    </div>
+
+    <div class="eyebrow" style="margin-top:40px">Common variations</div>
+    <div class="demo" style="white-space:pre-wrap"><span class="tail">/loop /jarvis strength=high</span>      <span class="d"># check small changes often</span>
+<span class="tail">/loop /jarvis strength=low</span>       <span class="d"># only big chunks, rarely</span>
+<span class="tail">/loop /jarvis risk=**/*payment*</span>  <span class="d"># risk paths warn immediately, any size</span>
+<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># turn off the gray-zone mirror (on by default)</span></div>
+
+    <div class="three" style="margin-top:22px">
+      <div class="col"><div class="big">Stop / pause</div><p>interrupt the loop (Esc)</p></div>
+      <div class="col"><div class="big">Resume</div><p>/loop /jarvis · restores saved settings</p></div>
+      <div class="col"><div class="big">Full reset</div><p>/jarvis-reset</p></div>
+    </div>
+
+    <div class="note" style="margin-top:24px">
+      ⚠️ Launch as <code style="font-family:var(--mono);color:var(--gold)">/loop /jarvis</code> with <b>no interval</b>.
+      <code style="font-family:var(--mono);color:var(--gold)">/loop 5m /jarvis</code> runs on a fixed schedule and <b>ignores</b>
+      jarvis's own <code style="font-family:var(--mono);color:var(--gold)">active</code> /
+      <code style="font-family:var(--mono);color:var(--gold)">idle</code> /
+      <code style="font-family:var(--mono);color:var(--gold)">strength</code> pacing.
+    </div>
+  </section>
+
+  <!-- PHILOSOPHY · CONT. -->
+  <section>
+    <div class="eyebrow">The Two Loops</div>
+    <h2>Human in the loop ✗ vs Machine in the loop ✓</h2>
     <div class="split" style="margin-bottom:8px">
       <div class="col bad">
         <h3>✗ Human in the loop</h3>

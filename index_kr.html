@@ -181,7 +181,59 @@
         <span class="danger">밖으로</span> 밀어내는 구조 — 를 만들기 때문입니다.</p>
       <p class="pull">그래서 이름이 자비스입니다 — 사람을 조종석에 앉혀두는 AI.</p>
     </div>
+  </section>
 
+  <!-- QUICK START -->
+  <section>
+    <div class="eyebrow">빠른 시작 · Quick Start</div>
+    <h2>세 단계면 워치가 돕니다</h2>
+    <p class="lead">설치하고, 재시작하고, 띄우면 끝. 최초 1회 강도(strength)를 물어본 뒤 jarvis는
+      <b style="color:var(--txt)">당신이</b> 코드를 짜는 동안 변경을 지켜보다 의미 있는 순간에만 페어 내비게이터를 깨웁니다.
+      <b style="color:var(--txt)">코드는 절대 직접 고치지 않습니다.</b></p>
+
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <h3>프로젝트에 설치</h3>
+        <p>설치 시 언어를 물어봅니다 — 영문 / 한글.</p>
+        <div class="demo" style="margin-top:12px;white-space:pre-wrap">curl -fsSL https://raw.githubusercontent.com/pinguding/Project-Machine-in-the-loop/main/install.sh | bash</div>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <h3>Claude Code 재시작</h3>
+        <p>훅과 상태줄은 세션 시작 시 로드됩니다.</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <h3>워치 시작</h3>
+        <div class="demo" style="margin-top:12px"><span class="tail">/loop /jarvis</span></div>
+        <p style="margin-top:10px">끝입니다. 새 변경이 쌓였거나·위험 경로가 바뀌었거나·커밋 경계를 넘었을 때만
+          Jarvis가 깨어납니다.</p>
+      </div></div>
+    </div>
+
+    <div class="eyebrow" style="margin-top:40px">자주 쓰는 변형</div>
+    <div class="demo" style="white-space:pre-wrap"><span class="tail">/loop /jarvis strength=high</span>      <span class="d"># 작은 변화도 자주 점검</span>
+<span class="tail">/loop /jarvis strength=low</span>       <span class="d"># 큰 덩어리만 드물게</span>
+<span class="tail">/loop /jarvis risk=**/*payment*</span>  <span class="d"># 위험 경로는 분량 무관 즉시 경고</span>
+<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># gray zone 거울 끄기 (기본 on)</span></div>
+
+    <div class="three" style="margin-top:22px">
+      <div class="col"><div class="big">멈춤 · 일시정지</div><p>루프 인터럽트(Esc)</p></div>
+      <div class="col"><div class="big">재개</div><p>/loop /jarvis · 저장된 설정 복원</p></div>
+      <div class="col"><div class="big">완전 초기화</div><p>/jarvis-reset</p></div>
+    </div>
+
+    <div class="note" style="margin-top:24px">
+      ⚠️ <b>간격 없이</b> <code style="font-family:var(--mono);color:var(--gold)">/loop /jarvis</code>로 띄우세요.
+      <code style="font-family:var(--mono);color:var(--gold)">/loop 5m /jarvis</code>는 고정 스케줄로 돌아 jarvis의
+      <code style="font-family:var(--mono);color:var(--gold)">active</code> /
+      <code style="font-family:var(--mono);color:var(--gold)">idle</code> /
+      <code style="font-family:var(--mono);color:var(--gold)">strength</code> 페이싱을 <b>무시합니다.</b>
+    </div>
+  </section>
+
+  <!-- PHILOSOPHY · CONT. -->
+  <section>
+    <div class="eyebrow">두 개의 루프</div>
+    <h2>Human in the loop ✗ vs Machine in the loop ✓</h2>
     <div class="split" style="margin-bottom:8px">
       <div class="col bad">
         <h3>✗ Human in the loop</h3>
