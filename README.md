@@ -12,7 +12,7 @@ The human writes the code; the AI stays an observer.
 
 🔗 **[View on the web](https://pinguding.github.io/Project-Machine-in-the-loop/)**
 
-`/jarvis`  ·  `threshold=50`  ·  `risk=**/*payment*`  ·  `debounce=90s`
+`/jarvis`  ·  `strength=medium`  ·  `risk=**/*payment*`  ·  `debounce=90s`
 
 </div>
 
@@ -185,12 +185,12 @@ For every feature you add, you ask: ① Does this seat the human *more* firmly i
 
 ## How it works — watch cheaply, wake only when it's risky
 
-The polling itself is a single `git diff`, so it burns almost no tokens. The expensive Jarvis review runs only when a
-threshold, a risk path, or a commit boundary is crossed — **minimizing token spend.**
+The polling itself is a single `git diff`, so it burns almost no tokens. The expensive Jarvis review runs only when
+new change has accrued since the last review, a risk path changed, or a commit boundary is crossed — **minimizing token spend.**
 
-1. **Measure** — every wake, gauge the working-tree changed lines & files, risk-path changes, and current `HEAD`. Counts both tracked changes **and untracked (new) files.** Tokens ≈ 0.
+1. **Measure** — every wake, gauge the working-tree changed lines, risk-path changes, and current `HEAD`. Counts both tracked changes **and untracked (new) files.** Tokens ≈ 0.
 2. **Boundary check** — Was there a new commit? Was a change reverted? Auto-corrects by comparing against the marker (`.jarvis/baseline`).
-3. **Gate + debounce** — if any of threshold / risk / commit-boundary is met, it's review-worthy. But **if a conversation is live, defer**, and flush the accrued change at once when it goes quiet.
+3. **Gate + debounce** — if any of new-change / risk / commit-boundary is met, it's review-worthy. But **if a conversation is live, defer**, and flush the accrued change at once when it goes quiet.
 4. **Collect conventions & personalization → Jarvis** — gather the changed files' AGENTS.md / README / path rules + persona + focus area, pass them as context, and call Jarvis. The result is wrapped in markers.
 5. **Schedule the next wake** — uses `ScheduleWakeup` to queue its own next run. A standalone self-loop, with no `/loop` wrapper.
 
@@ -203,9 +203,9 @@ threshold, a risk path, or a commit boundary is crossed — **minimizing token s
 
 | | Feature | Description |
 |---|---|---|
-| 📏 | **Threshold gate** | When the change accrued since the last review crosses a **line-count or file-count** threshold, it reviews. The AI shows up only after the human has written a meaningful amount themselves. |
+| 📏 | **New-change gate** | When **new change has accrued since the last review** (any amount — no fixed line/file threshold), it reviews. It fires once per accrual, never re-reviewing the same change. The AI shows up only after the human has written something themselves. |
 | 🎯 | **Risk-path trigger** | Risk paths like payments and login fire **immediately on a single changed line**, regardless of volume. It never misses the "small but fatal." |
-| 🔒 | **Forced commit-boundary watch** | When a new commit is detected, it checks once even below threshold. **Right before a mistake is sealed into code** is the golden moment to warn. |
+| 🔒 | **Forced commit-boundary watch** | When a new commit is detected, it checks once regardless of accrued volume. **Right before a mistake is sealed into code** is the golden moment to warn. |
 | ⏸️ | **Conversation debounce** | During live conversation it defers the review, then handles the accrued change at once when things go quiet. **It doesn't break your flow.** |
 | 📚 | **Automatic convention collection** | Gathers the changed files' nearest AGENTS.md, directory README, and path-specific team rules. Reviews knowing even "this package's rules." |
 | ♾️ | **Standalone self-loop** | `ScheduleWakeup` is the engine of repetition. With no `/loop`, **one call and it runs on its own.** |
@@ -238,7 +238,7 @@ switches to implementation **only when the human delegates** — "fix this for m
 
 | Skill | Role |
 |------|------|
-| **jarvis** | The entry-point watch loop. Polls cheaply with `git diff`, and when threshold / risk-path / commit-boundary is crossed, calls `jarvis-once` and schedules its own next tick with `ScheduleWakeup`. |
+| **jarvis** | The entry-point watch loop. Polls cheaply with `git diff`, and when new change accrues / a risk-path changes / a commit-boundary is crossed, calls `jarvis-once` and schedules its own next tick with `ScheduleWakeup`. |
 | **jarvis-once** | The single-shot pair navigator. Only reviews, flags, and suggests next steps — **never writes code directly.** |
 | **jarvis-pause** | Stops only the wake loop. Preserves baseline & args, so `/jarvis-resume` continues from where it left off. |
 | **jarvis-resume** | Resumes the loop with the saved settings. |
@@ -266,25 +266,23 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 ## Configuration — tune with one line of args
 
 ```
-/jarvis threshold=40 risk=**/*payment* debounce=90s
+/jarvis strength=high risk=**/*payment* debounce=90s
 ```
 
 | Key | Meaning | Default |
 |---|---|---|
-| `strength` | Strength preset — sets the knobs below as a bundle (`low`/`medium`/`high`) | `medium` |
-| `threshold` | Accrued changed-line-count threshold | `50` |
-| `files` | Changed-file-count threshold (OR with lines) | `2` |
+| `strength` | Strength preset — sets the polling-interval knobs below as a bundle (`low`/`medium`/`high`) | `medium` |
 | `risk` | Risk-path glob — warns immediately, regardless of volume | `off` |
 | `debounce` | Idle time after which a conversation is considered settled | `90s` |
-| `active` | Wake interval when change is active / right after a review | `4m` |
-| `idle` | Wake interval when quiet | `25m` |
+| `active` | Wake interval when the working tree has changes / right after a review | `4m` |
+| `idle` | Wake interval when the working tree is clean | `25m` |
 | `warmup` | Number of fast-polling ticks right after first load | `3` |
 | `paths` | Restrict the watched paths | all |
 | `focus` | Focus-area directory | `.claude/jarvis/focus/` |
 | `mirror` | gray-zone mirror (non-coercive) | `on` |
 
-> 💡 **Lowering the threshold doesn't add nagging.** Jarvis stays silent below its own severity bar, so a low threshold
-> only adds *call cost*, not noise. If you want higher risk sensitivity, lower it without worry.
+> 💡 **Polling tightly doesn't add nagging.** Jarvis stays silent below its own severity bar, so tighter polling
+> only adds *call cost*, not noise. If you want faster response, raise the strength without worry.
 
 ---
 

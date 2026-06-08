@@ -1,13 +1,13 @@
 ---
 name: jarvis
-description: A watch loop that polls git change volume in a self-paced manner and, when a threshold is crossed, automatically runs the jarvis-once one-shot review. Configure strength preset, threshold, intervals, and paths via args (key=value). When called without args, it asks for strength once on first run. Right after first load it polls quickly for a short while (warmup). Use for "jarvis", "change-detection review loop", "jarvis watch" requests.
+description: A watch loop that polls git change volume in a self-paced manner and automatically runs the jarvis-once one-shot review when new change has accrued since the last review, a risk path changed, or a new commit appeared. There is no fixed line/file threshold. Configure strength preset, polling intervals, paths, and risk paths via args (key=value). When called without args, it asks for strength once on first run. Right after first load it polls quickly for a short while (warmup). Use for "jarvis", "change-detection review loop", "jarvis watch" requests.
 ---
 
 # jarvis
 
-A self-paced watch loop that cheaply polls git change volume while a human writes code directly, and once a meaningful amount accumulates (threshold exceeded), automatically runs the `jarvis-once` (one-shot navigator) skill once.
+A self-paced watch loop that cheaply polls git change volume while a human writes code directly, and once **new change has accrued since the last review** (no volume threshold), automatically runs the `jarvis-once` (one-shot navigator) skill once.
 
-- **Polling uses almost no tokens** (one `git diff --shortstat`). The expensive `jarvis-once` full review runs only when the threshold is exceeded.
+- **Polling uses almost no tokens** (one `git diff --shortstat`). The expensive `jarvis-once` full review runs only when new change has accrued since the last review, a risk path changed, or a new commit appeared.
 - **It is not event-driven.** There is no OS event that wakes it in real time on a human's hand edits, so it checks via periodic wakes. Instead, it keeps the check itself extremely cheap.
 - **`jarvis-once` does not fix code directly** (review/suggest/next steps only). If the human says "fix this," that turn switches to normal development mode.
 
@@ -26,31 +26,27 @@ This skill **repeats with just a single `/jarvis` call**, without a `/loop` wrap
 
 | key | meaning | default |
 |-----|------|--------|
-| `strength` | **Strength preset.** Sets the knobs below as a bundle in one go (`low`/`medium`/`high`). If individual knobs are given alongside, only those items are overridden. See "Strength preset" below. | `medium` |
-| `threshold` | Threshold for cumulative changed **line count** since the last review | `50` |
-| `files` | Threshold for changed **file count** (OR condition with lines) | `2` |
-| `active` | Next wake interval when `jarvis-once` ran on the previous wake or changes are active | `4m` |
-| `idle` | Next wake interval when below threshold (quiet) | `25m` |
+| `strength` | **Strength preset.** Sets the polling-interval knobs below as a bundle in one go (`low`/`medium`/`high`). If individual knobs are given alongside, only those items are overridden. See "Strength preset" below. | `medium` |
+| `active` | Next wake interval when `jarvis-once` ran on the previous wake or the working tree has changes | `4m` |
+| `idle` | Next wake interval when there is no change (working tree clean) | `25m` |
 | `debounce` | **Quiet time after which the conversation is considered to have stopped.** Even if conditions to review are met, if the human is mid-conversation, defer execution and reschedule briefly at this interval. Every time the human says something, the timer resets. | `90s` |
-| `warmup` | **Number of fast-polling ticks on first load.** Right after boot, for this many ticks, recheck at the `active` interval instead of `idle` even when below threshold (fast response when first turned on). `0` turns it off. | `3` |
+| `warmup` | **Number of fast-polling ticks on first load.** Right after boot, for this many ticks, recheck at the `active` interval instead of `idle` even when there is no change (fast response when first turned on). `0` turns it off. | `3` |
 | `paths` | Limit the watch target to these paths (whole tree if omitted) | (whole tree) |
 | `risk` | **Risk path** glob — files matching this wake `jarvis-once` regardless of volume (even a single newly changed line). Comma-separate multiple. | (none/off) |
 | `focus` | **Focus area directory.** The `.md` collected here is viewed as a priority lens during review (see "Convention document collection" item 4). | `.claude/jarvis/focus/` |
 | `mirror` | **Mirror (gray-zone visualization).** If a substantial part of the cumulative changes is code *generated* in this session, point it out with a one-line memo on "whether you grasped it yourself" (non-enforcing). Turn off with `off`. See procedure 3.5 below. | `on` |
 
-> **The commit-boundary trigger is always on, independent of args.** When a new commit is detected, `jarvis-once` runs once on that commit's changes even if below threshold. This is because right before/after a mistake is sealed into code is the golden time for a warning. (manifesto: "AI actively warns about human mistakes")
+> **The commit-boundary trigger is always on, independent of args.** When a new commit is detected, `jarvis-once` runs once on that commit's changes regardless of accrued volume. This is because right before/after a mistake is sealed into code is the golden time for a warning. (manifesto: "AI actively warns about human mistakes")
 
 Examples:
 
 ```
 /jarvis                                              # no args → asks for strength once (medium default thereafter)
-/jarvis strength=high                                 # strong — check small changes often
-/jarvis strength=low                                  # weak — only large chunks, rarely
-/jarvis strength=high threshold=40                    # high preset + override only threshold to 40
-/jarvis threshold=40                                  # 40 lines OR 2 files (strength unspecified → medium base)
-/jarvis threshold=80 files=3 idle=30m                 # looser
+/jarvis strength=high                                 # strong — poll tightly (catch new change fast)
+/jarvis strength=low                                  # weak — poll rarely
+/jarvis strength=high idle=30m                        # high preset + override only idle to 30m
 /jarvis paths=src/billing active=3m                   # specific path only, more frequent
-/jarvis risk=**/*payment*,**/*auth*                   # payment/auth warned immediately regardless of volume
+/jarvis risk=**/*payment*,**/*auth*                   # payment/auth warned immediately on a single changed line
 ```
 
 Argument parsing rules:
@@ -63,17 +59,17 @@ Argument parsing rules:
 
 ## Strength preset (strength)
 
-Use a single `strength` to bundle "how sensitively/frequently to check." Each preset expands into the knob bundle below, and if individual knobs (`threshold=`, etc.) are present in the same call, **only those items** override the preset values.
+Use a single `strength` to bundle "how tightly to poll." Each preset expands into the knob bundle below, and if individual knobs (`active=`, etc.) are present in the same call, **only those items** override the preset values. (Since there is no line/file threshold, the preset changes *polling frequency*, not *volume sensitivity*.)
 
-| `strength` | aliases | `threshold` | `files` | `active` | `idle` | `debounce` | character |
-|-----------|------|-------------|---------|----------|--------|------------|------|
-| `low` | `약`, `약하게`, `느슨`, `relaxed`, `1` | `120` | `4` | `8m` | `40m` | `120s` | Only large chunks, rarely. Minimal noise, minimal cost |
-| `medium` | `중`, `보통`, `normal`, `2` | `50` | `2` | `4m` | `25m` | `90s` | Default. Balanced |
-| `high` | `강`, `강하게`, `촘촘`, `aggressive`, `3` | `25` | `1` | `3m` | `12m` | `60s` | Even small changes, often. Most sensitive |
+| `strength` | aliases | `active` | `idle` | `debounce` | character |
+|-----------|------|----------|--------|------------|------|
+| `low` | `약`, `약하게`, `느슨`, `relaxed`, `1` | `8m` | `40m` | `120s` | Poll rarely. Minimal noise, minimal cost |
+| `medium` | `중`, `보통`, `normal`, `2` | `4m` | `25m` | `90s` | Default. Balanced |
+| `high` | `강`, `강하게`, `촘촘`, `aggressive`, `3` | `3m` | `12m` | `60s` | Poll tightly. Catches new change/commits fastest |
 
 Rules:
-- The preset touches only the 5 knobs above (`threshold`/`files`/`active`/`idle`/`debounce`). `paths`/`risk` are specified separately, independent of the preset.
-- Even with `strength=high`, the severity threshold of `jarvis-once` itself is unchanged — strength only raises the *call frequency*, not the nagging (see cost guide). So you can raise it with peace of mind.
+- The preset touches only the 3 knobs above (`active`/`idle`/`debounce`). `paths`/`risk` are specified separately, independent of the preset.
+- Even with `strength=high`, the severity threshold of `jarvis-once` itself is unchanged — strength only raises the *polling frequency* (how fast new change is caught), not the nagging (see cost guide). So you can raise it with peace of mind.
 - When scheduling the next wake, serialize the echoed args as **`strength=<value>` (+ individual overrides) as-is, not the expanded individual knobs.** That way the preset's meaning is preserved.
 
 ## Marker files
@@ -82,13 +78,13 @@ The baseline at the time of the last review is stored in `.jarvis/baseline`. Sin
 
 > **Why not use `.git/`:** The inside of `.git/` is a sensitive path, requiring permission approval on every write, which is unsuitable for an unattended loop. `.jarvis/` is an ordinary working-tree path with no permission friction, and guaranteeing it is untracked via `.gitignore` preserves the original benefit of "not committed + local only" as-is.
 
-Format (one line): `lines=<int> files=<int> risk=<int> head=<commit SHA> deferred=<0|1> boot=<int> mirrored=<0|1>`
-If the file does not exist, treat it as `lines=0 files=0 risk=0 head= deferred=0 boot=0 mirrored=0`. (If an old-version file lacks `boot`/`mirrored`, treat them as 0.)
-- `lines` / `files`: working-tree changed line/file count at the time of the last review
+Format (one line): `lines=<int> risk=<int> head=<commit SHA> deferred=<0|1> boot=<int> mirrored=<0|1>`
+If the file does not exist, treat it as `lines=0 risk=0 head= deferred=0 boot=0 mirrored=0`. (If an old-version file lacks `boot`/`mirrored`, treat them as 0; if a leftover `files` field is present, ignore it.)
+- `lines`: working-tree changed line count at the time of the last review. This is the baseline for deciding "has new change accrued since the last review."
 - `risk`: changed line count on risk paths (`risk` glob) at the time of the last review (0 if risk unset)
 - `head`: the `git rev-parse HEAD` value **observed on the previous tick.** Used for commit-boundary detection.
 - `deferred`: whether there is a **deferred review** that met conditions to review but was held off because of an ongoing conversation (debounce wait). If 1, flush the moment the conversation stops.
-- `boot`: remaining **warmup tick count.** Initialized to `warmup` at boot and decremented by 1 each tick. If `>0`, even below-threshold ticks poll at the `active` interval instead of `idle` (fast response right after first load).
+- `boot`: remaining **warmup tick count.** Initialized to `warmup` at boot and decremented by 1 each tick. If `>0`, even no-change ticks poll at the `active` interval instead of `idle` (fast response right after first load).
 - `mirrored`: **mirror cooldown flag.** Set to 1 after showing the mirror (procedure 3.5) to prevent repeated firing every tick. Released to 0 when human-typed changes again dominate or a review is flushed.
 
 ### Control state files (under `.jarvis/`)
@@ -105,7 +101,7 @@ The watch's lifecycle is controlled by the 3 files below. All are under `.jarvis
 
 ## Convention document collection (performed only right before calling `jarvis-once`)
 
-Performed only the moment it is decided to actually call `jarvis-once` (procedure 2a or 3 satisfied). On below-threshold ticks this is a waste of tokens, so **do not do it.**
+Performed only the moment it is decided to actually call `jarvis-once` (procedure 2a or 3 satisfied). On ticks with no review this is a waste of tokens, so **do not do it.**
 
 Purpose: let `jarvis-once` review with knowledge of "this package's, this directory's rules." `CLAUDE.md` and `.claude/rules/**` are auto-injected by the harness, so **do not collect them redundantly.** Gather only on-demand documents.
 
@@ -144,7 +140,7 @@ When delivering the `jarvis-once` review result to the user, always wrap the sta
 ```
 
 Rules:
-- Wrap only when `jarvis-once` actually says something (when there is review content). Do not attach markers to silence at the level of "nothing in particular catches my eye" or a one-line below-threshold notice.
+- Wrap only when `jarvis-once` actually says something (when there is review content). Do not attach markers to silence at the level of "nothing in particular catches my eye" or a one-line no-new-change notice.
 - Leave the body between the markers exactly as `jarvis-once` generated it. Put the watch's (`jarvis`) own operational messages (scheduling, debounce notices, etc.) **outside** the markers.
 - The tail phrase of the end marker is a fixed phrase reminding that authorship belongs to the human.
 
@@ -189,7 +185,7 @@ If the `.jarvis/baseline` file **does not exist**, this is the first startup tic
 - Ask for strength once with `AskUserQuestion`. The choices are 3: `strong (high)` / `medium (medium)` / `weak (low)`, plus a knob summary of each preset in the description. (The user can also give a value directly via "Other.")
 - Confirm the value the user picked as this tick's `strength`, and echo `strength=<chosen value>` in procedure 4's wake-schedule prompt. From the next wake on, args are non-empty so it does not ask again.
 - **Never ask on a scheduled-wake (auto-firing) tick** — args (including `strength=`) are always echoed, so it never enters this branch. This prevents the loop from being blocked by a question while the user is away.
-- If there is even one arg (e.g., `/jarvis strength=high`, `/jarvis threshold=40`), use that value as-is without asking.
+- If there is even one arg (e.g., `/jarvis strength=high`, `/jarvis idle=30m`), use that value as-is without asking.
 
 > This question is only "once when first turned on." To change strength later, call it again with `/jarvis strength=<value>` (it overwrites the in-progress schedule).
 
@@ -201,11 +197,10 @@ git diff --shortstat HEAD -- [paths]                 # ① tracked-file changes
 git ls-files --others --exclude-standard -- [paths]  # ② untracked (new) file list
 ```
 
-- From ①, parse `files changed`, `insertions(+)`, `deletions(-)`.
-- Add the line count of each file in ② (`wc -l`) and the file count.
+- From ①, parse `insertions(+)`, `deletions(-)`.
+- Add the line count of each file in ② (`wc -l`).
 - `cur_lines = (① insertions + deletions) + (② total line count of new files)`
-- `cur_files = (① files changed) + (② new file count)`
-- If both are empty, 0.
+- If empty, 0.
 
 > ⚠️ **Why ② is essential:** `git diff HEAD` **does not include untracked files.** If this is missing, when a human **writes a new file by hand** (the core use case of this project), jarvis sees 0 and stays silent until stage/commit. There is also a way to pull it into the index with `git add -N` (intent-to-add), but it **mutates the index, causing side effects in the unattended loop**, so it is not used — count it separately with the read-only `ls-files` and add it.
 
@@ -227,7 +222,7 @@ git rev-parse HEAD
 > Measurement is on a working-tree basis (vs. `HEAD`) including staged, unstaged, and **untracked**.
 
 ### 2. Boundary decision (auto-correct for commits/discards)
-Read `base_lines`, `base_files`, `base_risk`, `base_head` from `.jarvis/baseline`.
+Read `base_lines`, `base_risk`, `base_head` from `.jarvis/baseline`.
 
 **(a) Commit boundary — forced observation (always on):**
 If `base_head` is non-empty and `cur_head != base_head`, a **new commit was made** since the previous tick (commit/merge). Check once with `jarvis-once` regardless of volume.
@@ -244,15 +239,13 @@ If `base_head` is non-empty and `cur_head != base_head`, a **new commit was made
 If `cur_head == base_head` but `cur_lines < base_lines`, the user discarded changes. Reset the baseline to current values and do not run `jarvis-once`. (Go to procedure 4.)
 
 **(c) Otherwise — compute the increment:**
-- `delta_lines = cur_lines - base_lines`
-- `delta_files = cur_files` (file count is judged by the working-tree absolute value)
+- `delta_lines = cur_lines - base_lines` (lines newly accrued since the last review; positive means new change exists)
 - `delta_risk  = risk_lines - base_risk` (0 if risk unset)
 
 ### 3. Gate + debounce decision
 
 **Gate satisfaction** — if any one of the following holds, `gate_met = true`:
-- `delta_lines >= threshold`
-- `delta_files >= files`
+- `delta_lines >= 1` — if **new change has accrued** since the last review, review it (no fixed volume threshold). Already-reviewed change is absorbed into `base_lines` at the end of the procedure, so the same change does not fire again.
 - if `risk` set, `delta_risk >= 1` — risk paths are volume-independent. Warn even on a single newly changed line. (tenet 7: react to risk)
 
 **Whether a review is needed**: `should_review = gate_met OR (base_deferred == 1)`
@@ -273,11 +266,11 @@ Branches:
   - Leave a one-line watch operational message **outside** the markers (e.g., "change detected — holding off because we're talking, will review when it settles").
   - Reschedule briefly at the `debounce` interval in procedure 4.
 
-- **Otherwise (should_review == false):** output nothing, or just one line ("changes +N lines — below threshold, waiting").
+- **Otherwise (should_review == false):** no new change has accrued. Output nothing, or just one line ("no new change — waiting").
 
 **Baseline recording rules (always applied at the end of the procedure):**
 - `head`: record `cur_head` at the end of every tick. **Except when the commit boundary (2a) was deferred via debounce** — do not update `head` so it is detected again on the next quiet tick.
-- `lines` / `files` / `risk`: update to current values (`cur_lines`/`cur_files`/`risk_lines`) **only when `jarvis-once` was executed (flushed) or a discard reset (2b) occurred.** On deferred/unsatisfied ticks, keep the existing values so changes keep accumulating.
+- `lines` / `risk`: update to current values (`cur_lines`/`risk_lines`) **only when `jarvis-once` was executed (flushed) or a discard reset (2b) occurred.** Updating absorbs that change into the base, so from the next tick it is no longer seen as "new change" (prevents re-reviewing the same change). On deferred/unsatisfied ticks, keep the existing values so changes keep accumulating.
 - `deferred`: record the branch result above (0/1).
 - `boot`: record `boot_now` decremented by 1 (minimum 0). That is, warmup polling is maintained only for `warmup` ticks after boot, then automatically drops to `idle`. If `warmup=0`, no warmup from the start.
 - `mirrored`: record the procedure 3.5 result (0/1). 1 if the mirror was shown; 0 if a release condition (human direct typing dominates · review flush · discard reset) holds.
@@ -290,7 +283,7 @@ An auxiliary device for preserving authorship. **It neither blocks nor fixes cod
 - A change that appears only in the diff without such tool calls → **human-typed directly.**
 - It is **independent** of the severity gate — even if the generated code is clean and `jarvis-once` stays silent, the authorship signal fires separately.
 
-**Firing conditions (all must hold):** ① a substantial part of the cumulative change is AI-generated (roughly a majority) · ② the absolute amount is not trivial (e.g., at least half of `threshold`) · ③ `base_mirrored == 0` (not yet shown). When satisfied, leave a dry one-line memo **outside** the markers and record `mirrored=1`:
+**Firing conditions (all must hold):** ① a substantial part of the cumulative change is AI-generated (roughly a majority) · ② the absolute amount is not trivial (not a one-or-two-line edit) · ③ `base_mirrored == 0` (not yet shown). When satisfied, leave a dry one-line memo **outside** the markers and record `mirrored=1`:
 
 ```
 🪞 A substantial part of this change looks like code generated in this session — it'll be committed under your name, so make sure you've grasped it yourself.
@@ -310,14 +303,15 @@ Call `ScheduleWakeup` to schedule the next run.
 - Interval determination:
   - If the review was **deferred** this tick (`deferred` set to 1) → `debounce` (briefly, check again soon)
   - If `jarvis-once` was **executed (flushed)** this tick → `active`
-  - Unsatisfied but **in warmup** (`boot_now > 0`) → `active` (right after first load, recheck quickly instead of idle)
-  - Otherwise (unsatisfied · warmup ended) → `idle`
+  - **In warmup** (`boot_now > 0`) → `active` (right after first load, recheck quickly instead of idle)
+  - **If the working tree has changes** (`cur_lines > 0`) → `active` (work is in progress, so poll tightly to catch new change/commits fast)
+  - Otherwise (working tree clean · warmup ended) → `idle`
 - **Echo the args received this time as-is in the prompt.** That way the settings persist on the next wake too. If `strength` was used, serialize it in the **`strength=<value>` (+ individual overrides) form, not the expanded individual knobs** (preserve the strength meaning). e.g.:
 
   ```
   /jarvis strength=high paths=src/billing risk=**/*payment*
-  /jarvis strength=high threshold=40                      # preset + individual override is echoed as-is too
-  /jarvis threshold=50 files=2 active=4m idle=25m debounce=90s   # when strength is unused, echo as individual knobs
+  /jarvis strength=high idle=30m                          # preset + individual override is echoed as-is too
+  /jarvis active=4m idle=25m debounce=90s                 # when strength is unused, echo as individual knobs
   ```
 
   ⚠️ If you omit this echo, all settings revert to defaults from the second wake on. Always serialize and pass the full current effective args (`strength` or individual knobs + `paths`/`risk`).
@@ -344,8 +338,8 @@ How it works:
 
 - If the wake interval is under 5 minutes, the prompt cache (TTL 5 minutes) stays alive and the polling turn is nearly free. That's why the `active` default is 4 minutes.
 - When quiet, set `idle` long (default 25 minutes) to reduce accumulated cache-miss cost.
-- Most actual tokens are spent "the moment `jarvis-once` runs" (threshold exceeded · risk path · commit boundary). Raising the threshold reduces cost.
-- Even setting the threshold **low** does not increase noise. `jarvis-once` stays quiet on its own below its own severity threshold. A low threshold only increases the *call cost*, not the nagging — if you want to raise risk sensitivity, you can lower it with peace of mind.
+- Most actual tokens are spent "the moment `jarvis-once` runs" (new change accrued · risk path · commit boundary). Since it reviews each time new change accrues, tighter polling (strength `high`) means more frequent reviews and more cost. Setting `idle` long or lowering strength reduces it.
+- Polling **tightly** does not increase noise. `jarvis-once` stays quiet on its own below its own severity threshold. Tighter polling only increases the *call cost*, not the nagging — if you want faster response, you can raise it with peace of mind.
 - The commit-boundary trigger is only once per commit, so its cost is predictable, and being a single check "right before a mistake is sealed," it is the highest value-for-cost execution.
 
 ## Dependency note

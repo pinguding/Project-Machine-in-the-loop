@@ -1,13 +1,13 @@
 ---
 name: jarvis
-description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 jarvis-once 단발 리뷰를 자동 실행하는 워치 루프. args(key=value)로 강도 프리셋(strength)·임계값·간격·경로를 설정한다. args 없이 부르면 최초 1회 강도를 물어본다. 첫 로드 직후엔 잠깐 빠르게 폴링한다(warmup). "jarvis", "변경 감지 리뷰 루프", "jarvis 워치" 요청 시 사용.
+description: git 변경량을 self-paced로 폴링하다 직전 리뷰 이후 새 변경이 쌓이거나·위험 경로가 바뀌거나·새 커밋이 생기면 jarvis-once 단발 리뷰를 자동 실행하는 워치 루프. 고정 라인/파일 임계값은 없다. args(key=value)로 강도 프리셋(strength)·폴링 간격·경로·위험 경로를 설정한다. args 없이 부르면 최초 1회 강도를 물어본다. 첫 로드 직후엔 잠깐 빠르게 폴링한다(warmup). "jarvis", "변경 감지 리뷰 루프", "jarvis 워치" 요청 시 사용.
 ---
 
 # jarvis
 
-사람이 직접 코드를 짜는 동안 곁에서 git 변경량을 싸게 폴링하다가, 의미 있는 분량이 쌓이면(임계값 초과) `jarvis-once`(단발 navigator) 스킬을 자동으로 한 번 돌려주는 self-paced 워치 루프다.
+사람이 직접 코드를 짜는 동안 곁에서 git 변경량을 싸게 폴링하다가, 직전 리뷰 이후 **새 변경이 쌓이면**(분량 임계 없음) `jarvis-once`(단발 navigator) 스킬을 자동으로 한 번 돌려주는 self-paced 워치 루프다.
 
-- **폴링은 토큰을 거의 쓰지 않는다** (`git diff --shortstat` 한 번). 비싼 `jarvis-once` 풀 리뷰는 임계값을 넘었을 때만 실행한다.
+- **폴링은 토큰을 거의 쓰지 않는다** (`git diff --shortstat` 한 번). 비싼 `jarvis-once` 풀 리뷰는 직전 리뷰 이후 새 변경이 쌓였거나·위험 경로가 바뀌었거나·새 커밋이 생겼을 때만 실행한다.
 - **이벤트 기반이 아니다.** 사람 손 편집을 실시간으로 깨우는 OS 이벤트는 없으므로 주기적 wake로 확인한다. 대신 확인 자체를 극도로 싸게 유지한다.
 - **`jarvis-once`는 코드를 직접 고치지 않는다** (리뷰/제안/다음 스텝만). 사람이 "이거 고쳐줘"라고 하면 그 턴은 일반 개발 모드로 전환한다.
 
@@ -26,31 +26,27 @@ description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 
 
 | key | 의미 | 기본값 |
 |-----|------|--------|
-| `strength` | **강도 프리셋.** 아래 노브들을 한 번에 묶어 세팅한다(`low`/`medium`/`high`). 개별 노브를 같이 주면 그 항목만 덮어쓴다. 아래 "강도 프리셋" 참조. | `medium` |
-| `threshold` | 직전 리뷰 이후 누적 변경 **라인 수** 임계값 | `50` |
-| `files` | 변경 **파일 수** 임계값 (라인과 OR 조건) | `2` |
-| `active` | 직전 wake에서 `jarvis-once`를 실행했거나 변경이 활발할 때의 다음 wake 간격 | `4m` |
-| `idle` | 임계값 미달(잠잠)일 때의 다음 wake 간격 | `25m` |
+| `strength` | **강도 프리셋.** 폴링 간격 노브들을 한 번에 묶어 세팅한다(`low`/`medium`/`high`). 개별 노브를 같이 주면 그 항목만 덮어쓴다. 아래 "강도 프리셋" 참조. | `medium` |
+| `active` | 직전 wake에서 `jarvis-once`를 실행했거나 워킹트리에 변경이 있을 때의 다음 wake 간격 | `4m` |
+| `idle` | 변경이 없어 잠잠할 때(워킹트리 깨끗)의 다음 wake 간격 | `25m` |
 | `debounce` | **대화가 멎었다고 볼 정지 시간.** 리뷰할 조건이 됐어도 사람이 대화 중이면 실행을 미루고 이 간격으로 짧게 재예약한다. 사람이 한 마디 할 때마다 타이머가 리셋된다. | `90s` |
-| `warmup` | **첫 로드 빠른 폴링 tick 수.** 부팅 직후 이 횟수만큼은 임계값 미달이어도 `idle` 대신 `active` 간격으로 재확인한다(처음 켰을 때 반응을 빠르게). `0`이면 끔. | `3` |
+| `warmup` | **첫 로드 빠른 폴링 tick 수.** 부팅 직후 이 횟수만큼은 변경이 없어도 `idle` 대신 `active` 간격으로 재확인한다(처음 켰을 때 반응을 빠르게). `0`이면 끔. | `3` |
 | `paths` | 감시 대상 경로 한정 (생략 시 전체) | (전체) |
 | `risk` | **위험 경로** glob — 여기에 매칭되는 파일은 분량과 무관하게(단 한 줄이라도 새로 바뀌면) `jarvis-once`를 깨운다. 쉼표로 여러 개. | (없음/off) |
 | `focus` | **집중 영역 디렉토리.** 여기 모인 `.md`를 리뷰 시 우선 렌즈로 본다(아래 "컨벤션 문서 수집" 4번). | `.claude/jarvis/focus/` |
 | `mirror` | **거울(gray zone 가시화).** 누적 변경의 상당 부분이 이 세션에서 *생성된* 코드면 "직접 파악했는지" 한 줄 메모로 짚는다(비강제). `off`로 끔. 아래 절차 3.5 참조. | `on` |
 
-> **커밋 경계 트리거는 args와 무관하게 항상 켜져 있다.** 새 커밋이 감지되면 임계값 미달이어도 그 커밋 변경에 대해 `jarvis-once`를 1회 실행한다. 착오가 코드로 봉인되기 직전/직후가 경고의 골든타임이기 때문이다. (manifesto: "사람의 착오에는 AI가 적극적으로 경고")
+> **커밋 경계 트리거는 args와 무관하게 항상 켜져 있다.** 새 커밋이 감지되면 변경 누적과 무관하게 그 커밋 변경에 대해 `jarvis-once`를 1회 실행한다. 착오가 코드로 봉인되기 직전/직후가 경고의 골든타임이기 때문이다. (manifesto: "사람의 착오에는 AI가 적극적으로 경고")
 
 예시:
 
 ```
 /jarvis                                              # args 없음 → 최초 1회 강도를 물어봄 (이후 medium 기본)
-/jarvis strength=high                                 # 강하게 — 작은 변화도 자주 점검
-/jarvis strength=low                                  # 약하게 — 큰 덩어리만 드물게
-/jarvis strength=high threshold=40                    # 강 프리셋 + threshold만 40으로 덮어쓰기
-/jarvis threshold=40                                  # 40라인 OR 2파일 (strength 미지정 → medium 베이스)
-/jarvis threshold=80 files=3 idle=30m                 # 더 느슨하게
+/jarvis strength=high                                 # 강하게 — 촘촘히 폴링 (새 변경을 빨리 잡음)
+/jarvis strength=low                                  # 약하게 — 드물게 폴링
+/jarvis strength=high idle=30m                        # 강 프리셋 + idle만 30m으로 덮어쓰기
 /jarvis paths=src/billing active=3m                   # 특정 경로만, 더 촘촘히
-/jarvis risk=**/*payment*,**/*auth*                   # 결제·인증은 분량 무관 즉시 경고
+/jarvis risk=**/*payment*,**/*auth*                   # 결제·인증은 한 줄만 바뀌어도 즉시 경고
 ```
 
 인자 파싱 규칙:
@@ -63,17 +59,17 @@ description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 
 
 ## 강도 프리셋 (strength)
 
-`strength` 하나로 "얼마나 예민하게/자주 점검할지"를 묶어 조절한다. 각 프리셋은 아래 노브 묶음으로 전개되며, 같은 호출에 개별 노브(`threshold=` 등)가 있으면 **그 항목만** 프리셋 값을 덮어쓴다.
+`strength` 하나로 "얼마나 촘촘히 폴링할지"를 묶어 조절한다. 각 프리셋은 아래 노브 묶음으로 전개되며, 같은 호출에 개별 노브(`active=` 등)가 있으면 **그 항목만** 프리셋 값을 덮어쓴다. (라인/파일 임계값은 없으므로 프리셋은 *분량 민감도*가 아니라 *폴링 빈도*만 바꾼다.)
 
-| `strength` | 별칭 | `threshold` | `files` | `active` | `idle` | `debounce` | 성격 |
-|-----------|------|-------------|---------|----------|--------|------------|------|
-| `low` | `약`, `약하게`, `느슨`, `relaxed`, `1` | `120` | `4` | `8m` | `40m` | `120s` | 큰 덩어리만, 드물게. 소음 최소·비용 최소 |
-| `medium` | `중`, `보통`, `normal`, `2` | `50` | `2` | `4m` | `25m` | `90s` | 기본. 균형 |
-| `high` | `강`, `강하게`, `촘촘`, `aggressive`, `3` | `25` | `1` | `3m` | `12m` | `60s` | 작은 변화도, 자주. 가장 예민 |
+| `strength` | 별칭 | `active` | `idle` | `debounce` | 성격 |
+|-----------|------|----------|--------|------------|------|
+| `low` | `약`, `약하게`, `느슨`, `relaxed`, `1` | `8m` | `40m` | `120s` | 드물게 폴링. 소음 최소·비용 최소 |
+| `medium` | `중`, `보통`, `normal`, `2` | `4m` | `25m` | `90s` | 기본. 균형 |
+| `high` | `강`, `강하게`, `촘촘`, `aggressive`, `3` | `3m` | `12m` | `60s` | 촘촘히 폴링. 새 변경·커밋을 가장 빨리 잡음 |
 
 규칙:
-- 프리셋은 위 5개 노브(`threshold`/`files`/`active`/`idle`/`debounce`)만 건드린다. `paths`/`risk`는 프리셋과 무관하게 별도로 지정한다.
-- `strength=high`라도 `jarvis-once` 자체의 severity 문턱은 그대로다 — 강도는 *호출 빈도*를 높일 뿐 잔소리를 늘리지 않는다(비용 가이드 참조). 즉 안심하고 올려도 된다.
+- 프리셋은 위 3개 노브(`active`/`idle`/`debounce`)만 건드린다. `paths`/`risk`는 프리셋과 무관하게 별도로 지정한다.
+- `strength=high`라도 `jarvis-once` 자체의 severity 문턱은 그대로다 — 강도는 *폴링 빈도*(=새 변경을 잡는 속도)를 높일 뿐 잔소리를 늘리지 않는다(비용 가이드 참조). 즉 안심하고 올려도 된다.
 - 다음 wake 예약 시 echo하는 args에는 **전개된 개별 노브가 아니라 `strength=<값>`(+ 개별 덮어쓰기)을 그대로** 직렬화한다. 그래야 프리셋 의미가 보존된다.
 
 ## 마커 파일
@@ -82,13 +78,13 @@ description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 
 
 > **`.git/`을 쓰지 않는 이유:** `.git/` 내부는 민감 경로라 쓰기마다 권한 승인을 받아야 해서 무인 루프에 부적합하다. `.jarvis/`는 일반 워킹 트리 경로라 권한 마찰이 없고, `.gitignore`로 비추적을 보장하면 "커밋 안 됨 + 로컬 전용"이라는 원래 이점을 그대로 유지한다.
 
-형식(한 줄): `lines=<정수> files=<정수> risk=<정수> head=<커밋 SHA> deferred=<0|1> boot=<정수> mirrored=<0|1>`
-파일이 없으면 `lines=0 files=0 risk=0 head= deferred=0 boot=0 mirrored=0`으로 간주한다. (구버전 파일에 `boot`·`mirrored`가 없으면 0으로 본다.)
-- `lines` / `files`: 직전 리뷰 시점의 working tree 변경 라인/파일 수
+형식(한 줄): `lines=<정수> risk=<정수> head=<커밋 SHA> deferred=<0|1> boot=<정수> mirrored=<0|1>`
+파일이 없으면 `lines=0 risk=0 head= deferred=0 boot=0 mirrored=0`으로 간주한다. (구버전 파일에 `boot`·`mirrored`가 없으면 0으로 보고, `files` 필드가 남아 있으면 무시한다.)
+- `lines`: 직전 리뷰 시점의 working tree 변경 라인 수. "직전 리뷰 이후 새 변경이 쌓였나"를 판정하는 기준선이다.
 - `risk`: 직전 리뷰 시점의 위험 경로(`risk` glob) 변경 라인 수 (risk 미설정 시 0)
 - `head`: **직전 tick에서 관측한** `git rev-parse HEAD` 값. 커밋 경계 감지에 쓴다.
 - `deferred`: 리뷰할 조건이 됐지만 대화 중이라 **미뤄둔 리뷰가 있는지**(debounce 대기). 1이면 대화가 멎는 순간 flush한다.
-- `boot`: 남은 **웜업 tick 수.** 부팅 시 `warmup`으로 초기화되고 매 tick 1씩 줄어든다. `>0`이면 임계값 미달 tick도 `idle` 대신 `active` 간격으로 폴링한다(첫 로드 직후 빠른 반응).
+- `boot`: 남은 **웜업 tick 수.** 부팅 시 `warmup`으로 초기화되고 매 tick 1씩 줄어든다. `>0`이면 변경이 없는 tick도 `idle` 대신 `active` 간격으로 폴링한다(첫 로드 직후 빠른 반응).
 - `mirrored`: **거울 쿨다운 플래그.** 거울(절차 3.5)을 띄운 뒤 1로 둬 매 tick 반복 발화를 막는다. 사람이 직접 타이핑한 변경이 다시 주를 이루거나 리뷰를 flush하면 0으로 풀린다.
 
 ### 제어 상태 파일 (`.jarvis/` 하위)
@@ -105,7 +101,7 @@ description: git 변경량을 self-paced로 폴링하다 임계값을 넘으면 
 
 ## 컨벤션 문서 수집 (`jarvis-once` 호출 직전에만 수행)
 
-`jarvis-once`를 실제로 부르기로 결정한 순간(절차 2a 또는 3 충족)에만 수행한다. 미달 tick에서는 토큰 낭비이므로 **하지 않는다.**
+`jarvis-once`를 실제로 부르기로 결정한 순간(절차 2a 또는 3 충족)에만 수행한다. 리뷰하지 않는 tick에서는 토큰 낭비이므로 **하지 않는다.**
 
 목적: `jarvis-once`가 "이 패키지·이 디렉토리 규칙"까지 알고 리뷰하게 한다. `CLAUDE.md`와 `.claude/rules/**`는 하네스가 자동 주입하므로 **중복 수집하지 않는다.** on-demand 문서만 모은다.
 
@@ -144,7 +140,7 @@ git diff --name-only <base_head>..<cur_head>   # 커밋 경계로 깨운 경우
 ```
 
 규칙:
-- `jarvis-once`가 실제로 무언가 말할 때만(리뷰 내용이 있을 때) 감싼다. "특별히 걸리는 건 없어" 수준의 침묵·미달 한 줄 알림에는 마커를 붙이지 않는다.
+- `jarvis-once`가 실제로 무언가 말할 때만(리뷰 내용이 있을 때) 감싼다. "특별히 걸리는 건 없어" 수준의 침묵·"새 변경 없음" 한 줄 알림에는 마커를 붙이지 않는다.
 - 마커 사이 본문은 `jarvis-once`가 생성한 내용 그대로 둔다. 워치(`jarvis`) 자신의 운영 메시지(예약·debounce 안내 등)는 마커 **밖**에 둔다.
 - 끝 마커의 꼬리 문구는 저자성이 사람에게 있음을 상기시키는 고정 문구다.
 
@@ -189,7 +185,7 @@ git diff --name-only <base_head>..<cur_head>   # 커밋 경계로 깨운 경우
 - `AskUserQuestion`으로 강도를 1회 묻는다. 선택지는 `강하게(high)` / `보통(medium)` / `약하게(low)` 3개 + 각 프리셋의 노브 요약을 description에 적는다. (사용자는 "Other"로 직접 값을 줄 수도 있다.)
 - 사용자가 고른 값을 이번 tick의 `strength`로 확정하고, 절차 4의 wake 예약 prompt에 `strength=<선택값>`을 echo한다. 이후 wake부터는 args가 비어있지 않으므로 다시 묻지 않는다.
 - **예약 wake(자동 발화) tick에서는 절대 묻지 않는다** — args(`strength=` 포함)가 항상 echo되므로 이 분기에 들어오지 않는다. 사용자가 자리를 비운 사이 질문으로 루프가 막히는 일을 방지한다.
-- args가 하나라도 있으면(예: `/jarvis strength=high`, `/jarvis threshold=40`) 질문 없이 그 값을 그대로 쓴다.
+- args가 하나라도 있으면(예: `/jarvis strength=high`, `/jarvis idle=30m`) 질문 없이 그 값을 그대로 쓴다.
 
 > 이 질문은 "처음 켤 때 한 번"만이다. 강도를 나중에 바꾸려면 `/jarvis strength=<값>`으로 다시 부르면 된다(진행 중인 예약을 덮어쓴다).
 
@@ -201,11 +197,10 @@ git diff --shortstat HEAD -- [paths]                 # ① 추적 파일 변경
 git ls-files --others --exclude-standard -- [paths]  # ② 미추적(새) 파일 목록
 ```
 
-- ①에서 `files changed`, `insertions(+)`, `deletions(-)`를 파싱한다.
-- ②의 각 파일 라인 수(`wc -l`)와 파일 개수를 더한다.
+- ①에서 `insertions(+)`, `deletions(-)`를 파싱한다.
+- ②의 각 파일 라인 수(`wc -l`)를 더한다.
 - `cur_lines = (① insertions + deletions) + (② 새 파일들의 총 라인 수)`
-- `cur_files = (① files changed) + (② 새 파일 개수)`
-- 둘 다 비어 있으면 0.
+- 비어 있으면 0.
 
 > ⚠️ **왜 ②가 필수인가:** `git diff HEAD`는 **미추적 파일을 포함하지 않는다.** 이게 빠지면 사람이 **새 파일을 손으로 짤 때**(이 프로젝트의 핵심 사용 사례) jarvis가 stage/commit 전까지 0으로 보고 침묵한다. `git add -N`(intent-to-add)로 인덱스에 끌어들이는 방법도 있으나, **인덱스를 변조해 무인 루프에 부작용**을 주므로 쓰지 않는다 — 읽기 전용 `ls-files`로 따로 세어 더한다.
 
@@ -227,7 +222,7 @@ git rev-parse HEAD
 > 측정은 staged·unstaged·**미추적**을 모두 포함하는 working tree 기준(`HEAD` 대비)이다.
 
 ### 2. 경계 판단 (커밋·되돌림 자동 보정)
-`.jarvis/baseline`에서 `base_lines`, `base_files`, `base_risk`, `base_head`를 읽는다.
+`.jarvis/baseline`에서 `base_lines`, `base_risk`, `base_head`를 읽는다.
 
 **(a) 커밋 경계 — 강제 관찰 (항상 켜짐):**
 `base_head`가 비어있지 않고 `cur_head != base_head`이면, 직전 tick 이후 **새 커밋이 생겼다**(commit/merge). 분량과 무관하게 `jarvis-once`로 1회 점검한다.
@@ -244,15 +239,13 @@ git rev-parse HEAD
 `cur_head == base_head`인데 `cur_lines < base_lines`이면, 사용자가 변경을 되돌린 것이다. 기준선을 현재값으로 리셋하고 `jarvis-once`는 실행하지 않는다. (절차 4로)
 
 **(c) 그 외 — 증가분 계산:**
-- `delta_lines = cur_lines - base_lines`
-- `delta_files = cur_files` (파일 수는 working tree 절대값으로 판단)
+- `delta_lines = cur_lines - base_lines` (직전 리뷰 이후 새로 쌓인 라인 수; 양수면 새 변경 있음)
 - `delta_risk  = risk_lines - base_risk` (risk 미설정 시 0)
 
 ### 3. 게이트 + debounce 판단
 
 **게이트 충족 여부** — 다음 중 하나라도 충족하면 `gate_met = true`:
-- `delta_lines >= threshold`
-- `delta_files >= files`
+- `delta_lines >= 1` — 직전 리뷰 이후 **새 변경이 쌓였으면** 리뷰한다(고정 분량 임계 없음). 이미 리뷰한 변경은 절차 끝에서 `base_lines`로 흡수되므로 같은 변경을 다시 발동하지 않는다.
 - `risk` 설정 시 `delta_risk >= 1` — 위험 경로는 분량 무관. 단 한 줄이라도 새로 바뀌면 경고. (tenet 7: 위험에 반응)
 
 **리뷰 필요 여부**: `should_review = gate_met OR (base_deferred == 1)`
@@ -273,11 +266,11 @@ git rev-parse HEAD
   - 워치 운영 메시지를 마커 **밖**에 한 줄로 남긴다(예: "변경 감지 — 대화 중이라 보류, 멎으면 리뷰할게").
   - 절차 4에서 `debounce` 간격으로 짧게 재예약한다.
 
-- **그 외 (should_review == false):** 아무 것도 출력하지 않거나 한 줄만("변경 +N라인 — 임계값 미달, 대기").
+- **그 외 (should_review == false):** 새로 쌓인 변경이 없는 경우다. 아무 것도 출력하지 않거나 한 줄만("새 변경 없음 — 대기").
 
 **기준선 기록 규칙 (절차 끝에서 항상 적용):**
 - `head`: 매 tick 끝에 `cur_head`로 기록한다. **단, 커밋 경계(2a)를 debounce로 미룬 경우는 예외** — 다음 조용한 tick에서 다시 감지되도록 `head`를 갱신하지 않는다.
-- `lines` / `files` / `risk`: **`jarvis-once`를 실행(flush)했거나 되돌림 리셋(2b)한 경우에만** 현재값(`cur_lines`/`cur_files`/`risk_lines`)으로 갱신한다. 미룸·미충족 tick에서는 기존 값을 유지해 변경이 계속 누적되게 둔다.
+- `lines` / `risk`: **`jarvis-once`를 실행(flush)했거나 되돌림 리셋(2b)한 경우에만** 현재값(`cur_lines`/`risk_lines`)으로 갱신한다. 갱신하면 그 변경이 base로 흡수돼 다음 tick부터는 "새 변경"으로 잡히지 않는다(같은 변경 반복 리뷰 방지). 미룸·미충족 tick에서는 기존 값을 유지해 변경이 계속 누적되게 둔다.
 - `deferred`: 위 분기 결과(0/1)를 기록한다.
 - `boot`: `boot_now`에서 1 줄여 기록한다(최소 0). 즉 부팅 후 `warmup` tick 동안만 웜업 폴링이 유지되고, 그 뒤 자동으로 `idle`로 내려간다. `warmup=0`이면 처음부터 웜업 없음.
 - `mirrored`: 절차 3.5 결과(0/1)를 기록한다. 거울을 띄웠으면 1, 풀림 조건(사람 직접 타이핑이 주를 이룸 · 리뷰 flush · 되돌림 리셋)이면 0.
@@ -290,7 +283,7 @@ git rev-parse HEAD
 - 그런 도구 호출 없이 diff에만 나타난 변경 → **사람이 직접 타이핑.**
 - severity 게이트와 **독립**이다 — 생성 코드가 깔끔해 `jarvis-once`가 침묵해도 저자성 신호는 따로 뜬다.
 
-**발화 조건 (모두 충족):** ① 누적 변경의 상당 부분이 AI 생성(대략 과반) · ② 절대량이 사소하지 않음(예: `threshold`의 절반 이상) · ③ `base_mirrored == 0`(아직 안 띄움). 충족 시 마커 **밖**에 건조한 메모 한 줄을 남기고 `mirrored=1`로 기록한다:
+**발화 조건 (모두 충족):** ① 누적 변경의 상당 부분이 AI 생성(대략 과반) · ② 절대량이 사소하지 않음(한두 줄 수정 수준이 아님) · ③ `base_mirrored == 0`(아직 안 띄움). 충족 시 마커 **밖**에 건조한 메모 한 줄을 남기고 `mirrored=1`로 기록한다:
 
 ```
 🪞 이번 변경의 상당 부분이 이 세션에서 생성된 코드로 보여 — 네 이름으로 커밋될 텐데 직접 파악했는지 확인 필요.
@@ -310,14 +303,15 @@ git rev-parse HEAD
 - 간격 결정:
   - 이번 tick에서 리뷰를 **미뤘으면**(`deferred`를 1로 세팅) → `debounce` (짧게, 곧 다시 확인)
   - 이번 tick에서 `jarvis-once`를 **실행(flush)했으면** → `active`
-  - 미충족이지만 **웜업 중**(`boot_now > 0`) → `active` (첫 로드 직후엔 idle 대신 빠르게 재확인)
-  - 그 외(미충족 · 웜업 종료) → `idle`
+  - **웜업 중**(`boot_now > 0`) → `active` (첫 로드 직후엔 idle 대신 빠르게 재확인)
+  - **워킹트리에 변경이 있으면**(`cur_lines > 0`) → `active` (작업이 진행 중이니 촘촘히 폴링해 새 변경·커밋을 빨리 잡는다)
+  - 그 외(워킹트리 깨끗 · 웜업 종료) → `idle`
 - **prompt에는 이번에 받은 args를 그대로 echo 한다.** 그래야 다음 wake에서도 설정이 유지된다. `strength`를 쓴 경우 **전개된 개별 노브가 아니라 `strength=<값>`(+ 개별 덮어쓰기)** 형태로 직렬화한다(강도 의미 보존). 예:
 
   ```
   /jarvis strength=high paths=src/billing risk=**/*payment*
-  /jarvis strength=high threshold=40                      # 프리셋 + 개별 덮어쓰기도 그대로 echo
-  /jarvis threshold=50 files=2 active=4m idle=25m debounce=90s   # strength 미사용 시는 개별 노브로 echo
+  /jarvis strength=high idle=30m                          # 프리셋 + 개별 덮어쓰기도 그대로 echo
+  /jarvis active=4m idle=25m debounce=90s                 # strength 미사용 시는 개별 노브로 echo
   ```
 
   ⚠️ 이 echo를 빠뜨리면 두 번째 wake부터 모든 설정이 기본값으로 돌아간다. 반드시 현재 유효 args 전체(`strength` 또는 개별 노브 + `paths`·`risk`)를 직렬화해 넘긴다.
@@ -344,8 +338,8 @@ git rev-parse HEAD
 
 - wake 간격이 5분 미만이면 prompt 캐시(TTL 5분)가 살아 폴링 턴이 거의 공짜다. 그래서 `active` 기본값은 4분이다.
 - 잠잠할 때는 `idle`을 길게(기본 25분) 두어 캐시 미스 누적 비용을 줄인다.
-- 실제 토큰의 대부분은 "`jarvis-once`가 도는 순간"(임계값 초과·위험 경로·커밋 경계)에 쓰인다. 임계값을 올리면 비용이 준다.
-- 임계값을 **낮게** 잡아도 소음은 늘지 않는다. `jarvis-once`는 자체 severity 문턱 아래선 스스로 조용히 있기 때문이다. 낮은 임계값은 *호출 비용*만 늘릴 뿐 잔소리를 늘리지 않는다 — 위험 민감도를 높이고 싶으면 안심하고 낮춰도 된다.
+- 실제 토큰의 대부분은 "`jarvis-once`가 도는 순간"(새 변경 누적·위험 경로·커밋 경계)에 쓰인다. 새 변경이 쌓일 때마다 리뷰하므로, 폴링이 촘촘할수록(강도 `high`) 리뷰가 잦아져 비용이 는다. `idle`을 길게 잡거나 강도를 낮추면 준다.
+- 폴링을 **촘촘히** 해도 소음은 늘지 않는다. `jarvis-once`는 자체 severity 문턱 아래선 스스로 조용히 있기 때문이다. 폴링을 높이면 *호출 비용*만 늘릴 뿐 잔소리를 늘리지 않는다 — 반응 속도를 높이고 싶으면 안심하고 올려도 된다.
 - 커밋 경계 트리거는 커밋당 1회뿐이라 비용이 예측 가능하고, "착오 봉인 직전" 단 한 번의 점검이라 비용 대비 가치가 가장 높은 실행이다.
 
 ## 의존성 주의

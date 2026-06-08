@@ -158,7 +158,7 @@
       The human writes the code; the AI stays an observer.</p>
     <div class="cta">
       <span class="pill key">/jarvis</span>
-      <span class="pill">threshold=50</span>
+      <span class="pill">strength=medium</span>
       <span class="pill">risk=**/*payment*</span>
       <span class="pill">debounce=90s</span>
     </div>
@@ -285,19 +285,19 @@
   <!-- HOW IT WORKS -->
   <section>
     <div class="eyebrow">How It Works</div>
-    <h2>Watch cheaply, wake only when it's risky</h2>
+    <h2>Watch cheaply, wake only on new change, risk, or commit</h2>
     <p class="lead">Polling itself is a single <code style="font-family:var(--mono);color:var(--gold)">git diff</code>,
-      so it barely uses any tokens. The expensive Jarvis review runs only when a threshold, risk, or commit boundary is crossed,
+      so it barely uses any tokens. The expensive Jarvis review runs only when new change has accrued since the last review, a risk path changed, or a commit boundary is crossed,
       <b style="color:var(--txt)">keeping token consumption to a minimum.</b></p>
     <div class="flow">
       <div class="step"><div class="num">1</div><div class="body">
-        <h3>Measure</h3><p>On every wake, gauge the working tree's changed lines and file count, risky-path changes, and the current <code>HEAD</code>. Almost zero tokens.</p>
+        <h3>Measure</h3><p>On every wake, gauge the working tree's changed lines, risky-path changes, and the current <code>HEAD</code>. Almost zero tokens.</p>
       </div></div>
       <div class="step"><div class="num">2</div><div class="body">
-        <h3>Judge boundaries</h3><p>Was a new commit made? Were changes reverted? Compare against the marker (<code>.git/jarvis-baseline</code>) and auto-correct.</p>
+        <h3>Judge boundaries</h3><p>Was a new commit made? Were changes reverted? Compare against the marker (<code>.jarvis/baseline</code>) and auto-correct.</p>
       </div></div>
       <div class="step"><div class="num">3</div><div class="body">
-        <h3>Gate + debounce</h3><p>If any one of threshold, risk, or commit boundary is met, it's a review candidate. But <b>if a conversation is underway, hold</b>, then flush the accumulated changes all at once when it settles.</p>
+        <h3>Gate + debounce</h3><p>If any one of new change, risk, or commit boundary is met, it's a review candidate. But <b>if a conversation is underway, hold</b>, then flush the accumulated changes all at once when it settles.</p>
       </div></div>
       <div class="step"><div class="num">4</div><div class="body">
         <h3>Gather conventions → Jarvis</h3><p>Collect the changed files' AGENTS.md, README, and per-path rules, pass them as context, and call Jarvis. The result is wrapped in markers.</p>
@@ -314,14 +314,14 @@
     <h2>Reacts to risk, not volume</h2>
     <div class="grid">
       <div class="feat"><span class="tag">GATE</span><span class="ic">📏</span>
-        <h3>Threshold gate</h3>
-        <p>When changes accumulated since the last review cross the <b>line-count or file-count</b> threshold, it reviews. The AI shows up only after the human has personally written a meaningful amount.</p></div>
+        <h3>New-change gate</h3>
+        <p>When <b>new change has accrued since the last review</b> (any amount — no fixed line/file threshold), it reviews. It fires once per accrual, never re-reviewing the same change. The AI shows up only after the human has personally written something.</p></div>
       <div class="feat"><span class="tag">RISK</span><span class="ic">🎯</span>
         <h3>Risky-path trigger</h3>
         <p><b>Risky paths</b> like payments and login warn instantly the moment even one line changes, regardless of volume. It never misses the "small but fatal."</p></div>
       <div class="feat"><span class="tag">COMMIT</span><span class="ic">🔒</span>
         <h3>Enforced commit-boundary observation</h3>
-        <p>When a new commit is detected, it checks once even below threshold. <b>The moment just before a slip gets sealed into code</b> is the golden time for a warning.</p></div>
+        <p>When a new commit is detected, it checks once regardless of accrued volume. <b>The moment just before a slip gets sealed into code</b> is the golden time for a warning.</p></div>
       <div class="feat"><span class="tag">DEBOUNCE</span><span class="ic">⏸️</span>
         <h3>Conversation debounce</h3>
         <p>It defers reviews during a live conversation, then delivers the accumulated changes all at once when the conversation settles. <b>It doesn't break your flow.</b></p></div>
@@ -368,24 +368,23 @@ which could lead to a crash — worth checking this path on empty input.
   <section>
     <div class="eyebrow">Configuration</div>
     <h2>Tune it in a single line of args</h2>
-    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/jarvis threshold=40 risk=**/*payment* debounce=90s</code></p>
+    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/jarvis strength=high risk=**/*payment* debounce=90s</code></p>
     <table>
       <tr><th>Key</th><th>Meaning</th><th>Default</th></tr>
-      <tr><td><code>threshold</code></td><td class="desc">Accumulated changed-line threshold</td><td><span class="def">50</span></td></tr>
-      <tr><td><code>files</code></td><td class="desc">Changed-file threshold (OR'd with lines)</td><td><span class="def">2</span></td></tr>
+      <tr><td><code>strength</code></td><td class="desc">Strength preset — bundles the polling-interval knobs below (low/medium/high)</td><td><span class="def">medium</span></td></tr>
       <tr><td><code>risk</code></td><td class="desc">Risky-path glob — warns instantly, regardless of volume</td><td><span class="def">off</span></td></tr>
       <tr><td><code>debounce</code></td><td class="desc">Quiet time before a conversation is considered settled</td><td><span class="def">90s</span></td></tr>
-      <tr><td><code>active</code></td><td class="desc">Wake interval during active change / right after a review</td><td><span class="def">4m</span></td></tr>
-      <tr><td><code>idle</code></td><td class="desc">Wake interval when things are quiet</td><td><span class="def">25m</span></td></tr>
+      <tr><td><code>active</code></td><td class="desc">Wake interval when the working tree has changes / right after a review</td><td><span class="def">4m</span></td></tr>
+      <tr><td><code>idle</code></td><td class="desc">Wake interval when the working tree is clean</td><td><span class="def">25m</span></td></tr>
+      <tr><td><code>warmup</code></td><td class="desc">Number of fast-polling ticks right after first load</td><td><span class="def">3</span></td></tr>
       <tr><td><code>paths</code></td><td class="desc">Restrict the watched paths</td><td><span class="def">all</span></td></tr>
-      <tr><td><code>strength</code></td><td class="desc">Strength preset — bundles the knobs above (low/medium/high)</td><td><span class="def">medium</span></td></tr>
       <tr><td><code>focus</code></td><td class="desc">Focus-area directory — a set of docs viewed as a priority lens</td><td><span class="def">.claude/jarvis/focus/</span></td></tr>
       <tr><td><code>mirror</code></td><td class="desc">Gray-zone mirror — a one-line memo when generated code runs high (non-enforcing)</td><td><span class="def">on</span></td></tr>
     </table>
     <div class="note">
-      💡 <b>Lowering the threshold doesn't add nagging.</b> Because Jarvis falls silent on its own below its own severity bar,
-      a low threshold only adds call cost — it makes no noise.
-      If you want higher risk sensitivity, lower it without worry.
+      💡 <b>Polling tightly doesn't add nagging.</b> Because Jarvis falls silent on its own below its own severity bar,
+      tighter polling only adds call cost — it makes no noise.
+      If you want faster response, raise the strength without worry.
     </div>
   </section>
 
