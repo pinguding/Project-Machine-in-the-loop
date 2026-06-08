@@ -187,11 +187,16 @@ if os.path.exists(path):
 
 msgs = []
 
+# Match our assets by path fragment so ~ / absolute / relative variants don't duplicate.
+SL_MARK = "jarvis/assets/statusline.sh"
+HK_MARK = "jarvis/assets/loop-watch-hook.sh"
+
 # statusLine — never clobber a user's existing one
 sl = data.get("statusLine")
+sl_now = sl.get("command", "") if isinstance(sl, dict) else ""
 if sl is None:
     data["statusLine"] = {"type": "command", "command": sl_cmd}; msgs.append("statusLine: set")
-elif isinstance(sl, dict) and sl.get("command") == sl_cmd:
+elif SL_MARK in sl_now:
     msgs.append("statusLine: already set")
 else:
     msgs.append("statusLine: kept existing (compose jarvis statusline.sh in by hand if wanted)")
@@ -203,7 +208,7 @@ def ensure(event):
     if not isinstance(arr, list): return False
     for g in arr:
         for h in (g or {}).get("hooks", []):
-            if (h or {}).get("command") == hk_cmd: return False
+            if HK_MARK in (h or {}).get("command", ""): return False
     arr.append({"hooks": [{"type": "command", "command": hk_cmd}]}); return True
 added_hook = ensure("Stop") | ensure("StopFailure")
 msgs.append("hooks: Stop/StopFailure " + ("added" if added_hook else "already set"))
