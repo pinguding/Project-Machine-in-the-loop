@@ -149,6 +149,13 @@ if [ "$MODE" = "project" ]; then
 fi
 
 # ---- done ----
+# statusline asset path (for the optional liveness indicator hint below)
+if [ "$MODE" = "global" ]; then
+  STATUSLINE='~/.claude/skills/jarvis/assets/statusline.sh'
+else
+  STATUSLINE='.claude/skills/jarvis/assets/statusline.sh'
+fi
+
 say ""
 say "${G}${B}Done.${R}"
 say ""
@@ -166,6 +173,11 @@ cat <<EOF
   stop/pause  ${D}→${R} interrupt the loop (Esc)
   resume      ${D}→${R} ${C}/loop /jarvis${R} again (restores saved settings)
   full reset  ${D}→${R} ${C}/jarvis-reset${R}
+
+  Optional — ${B}always-on liveness in the status line${R} (watching / next check / ⚠ stalled?):
+  add this to your ${C}settings.json${R} (not changed automatically):
+    ${D}"statusLine": { "type": "command", "command": "bash ${STATUSLINE}" }${R}
+  ${D}prints nothing when the watch isn't running, so it's safe to leave on.${R}
 
   Personalize:
   ${D}·${R} .claude/skills/jarvis-once/persona.md   navigator's character & focus (ships empty)

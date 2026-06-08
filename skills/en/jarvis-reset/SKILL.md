@@ -1,6 +1,6 @@
 ---
 name: jarvis-reset
-description: Deletes the jarvis watch's local state (.jarvis/baseline·args) for a full reset. The next /loop /jarvis starts from a first boot (banner, strength question). This does not stop the loop itself — it is an independent command that just clears the accrued tracking and saved strength. Use on requests like "reset jarvis", "jarvis reset", "clear the watch state", "start over".
+description: Deletes the jarvis watch's local state (.jarvis/baseline·args·status) for a full reset. The next /loop /jarvis starts from a first boot (banner, strength question). This does not stop the loop itself — it is an independent command that just clears the accrued tracking and saved strength. Use on requests like "reset jarvis", "jarvis reset", "clear the watch state", "start over".
 ---
 
 # jarvis-reset
@@ -18,9 +18,10 @@ description: Deletes the jarvis watch's local state (.jarvis/baseline·args) for
 1. **Delete state files in bulk**:
 
    ```bash
-   rm -f .jarvis/baseline .jarvis/args .jarvis/paused
+   rm -f .jarvis/baseline .jarvis/args .jarvis/status .jarvis/paused
    ```
 
+   - `.jarvis/status` is the liveness state file; deleting it clears the statusline immediately (shows watch not running).
    - `.jarvis/paused` may be a leftover from an older version; delete it too (harmless if absent).
    - The `.jarvis/` directory itself may be left in place (there may be other caches). Even if empty, there is no need to delete it.
 

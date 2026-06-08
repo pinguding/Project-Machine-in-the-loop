@@ -235,6 +235,30 @@ switches to implementation **only when the human delegates** — "fix this for m
 
 ---
 
+## Liveness — is it looping right now?
+
+`/loop` has no resident process, so between ticks nothing runs and it's easy to lose track of whether the watch is
+still alive. Jarvis signals it in two layers:
+
+- **Tick heartbeat** — even on a quiet tick (no new change), it leaves one line: `⏱ jarvis · alive · next check ~4m (active) · strength=medium`.
+- **Status line** — every tick writes `.jarvis/status`, and a bundled script (`assets/statusline.sh`) renders the
+  watch state on every UI render — *between* ticks too. If the next wake time passes with no update, it even infers a stall:
+
+```
+🤖 jarvis · watching · next ~3m (active)              # alive
+🤖 jarvis · ⚠ stalled? no tick for 11m — /loop /jarvis to resume
+```
+
+Enable the status line yourself (install never touches your `settings.json`):
+
+```json
+{ "statusLine": { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/statusline.sh" } }
+```
+
+It prints nothing when the watch isn't running, so it's safe to leave always on.
+
+---
+
 ## Layout — `.claude/skills/`
 
 | Skill | Role |

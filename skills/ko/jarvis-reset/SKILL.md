@@ -1,6 +1,6 @@
 ---
 name: jarvis-reset
-description: jarvis 워치의 로컬 상태(.jarvis/baseline·args)를 삭제해 완전 초기화한다. 다음 /loop /jarvis는 최초 부팅(배너·강도 질문)부터 새로 시작한다. 루프 자체를 멈추는 게 아니라 누적 추적·저장된 강도를 비우는 독립 명령이다. "jarvis 초기화", "jarvis reset", "워치 상태 비우기", "처음부터 다시" 요청 시 사용.
+description: jarvis 워치의 로컬 상태(.jarvis/baseline·args·status)를 삭제해 완전 초기화한다. 다음 /loop /jarvis는 최초 부팅(배너·강도 질문)부터 새로 시작한다. 루프 자체를 멈추는 게 아니라 누적 추적·저장된 강도를 비우는 독립 명령이다. "jarvis 초기화", "jarvis reset", "워치 상태 비우기", "처음부터 다시" 요청 시 사용.
 ---
 
 # jarvis-reset
@@ -18,9 +18,10 @@ description: jarvis 워치의 로컬 상태(.jarvis/baseline·args)를 삭제해
 1. **상태 파일 일괄 삭제**:
 
    ```bash
-   rm -f .jarvis/baseline .jarvis/args .jarvis/paused
+   rm -f .jarvis/baseline .jarvis/args .jarvis/status .jarvis/paused
    ```
 
+   - `.jarvis/status`는 생존 신호용 상태 파일이다. 지우면 statusline이 즉시 비워진다(워치 미가동 표시).
    - `.jarvis/paused`는 구버전 잔재일 수 있어 함께 지운다(없으면 무해).
    - `.jarvis/` 디렉토리 자체는 남겨도 무방하다(다른 캐시가 있을 수 있음). 비어 있어도 굳이 지우지 않는다.
 

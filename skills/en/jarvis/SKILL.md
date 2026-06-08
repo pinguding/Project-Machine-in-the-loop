@@ -101,6 +101,7 @@ The watch's progress is controlled by the 2 files below. Both are under `.jarvis
 |------|------|----------------|
 | `.jarvis/baseline` | The watch baseline in the format above. The core of loop progress state. If it remains on disk, the next `/loop /jarvis` continues watching from that point (= resume). | written every tick / deleted by `/jarvis-reset` |
 | `.jarvis/args` | The effective args string of the previous tick (e.g., `strength=medium`). Updated every tick. If the next start is invoked **with no args**, jarvis reads this value and auto-resumes with the same settings (procedure 0.4). Default (medium) if absent. | written every tick / deleted by `/jarvis-reset` |
+| `.jarvis/status` | **A one-line liveness state** (see "Liveness" below). At the end of every tick it records the next wake time (`next_wake` epoch), interval, and strength. The statusline script reads this file to continuously show "watching / stalled?" **between** ticks. | written every tick / deleted by `/jarvis-reset` |
 
 > **Lifecycle (on top of `/loop`):** Start/resume is `/loop /jarvis` — if baseline/args remain, it continues from that state. Stop/pause is interrupting the `/loop` itself (Esc) — no next wake gets scheduled so the loop ends, and baseline/args stay on disk waiting to resume. Full reset is **`/jarvis-reset`** (an independent skill: delete baseline/args → next start is a first boot). Loop termination has no teardown hook, so state cleanup only happens at start time (self-correction) and via `/jarvis-reset`. (The old `.jarvis/paused` flag and `/jarvis-pause`·`/jarvis-resume`·`/jarvis-stop` are no longer used.)
 
@@ -296,7 +297,7 @@ Branches:
   - Leave a one-line watch operational message **outside** the markers (e.g., "change detected — holding off because we're talking, will review when it settles").
   - Reschedule briefly at the `debounce` interval in procedure 4.
 
-- **Otherwise (should_review == false):** no new change has accrued. Output nothing, or just one line ("no new change — waiting").
+- **Otherwise (should_review == false):** no new change has accrued. Don't go silent — leave a **one-line heartbeat** (see "Liveness (A)" below) outside the markers — except when we're talking (`active_chat == true`), in which case skip it (the statusline covers it).
 
 **Baseline recording rules (always applied at the end of the procedure):**
 - `head`: record `cur_head` at the end of every tick. **Except when the commit boundary (2a) was deferred via debounce** — do not update `head` so it is detected again on the next quiet tick.
@@ -347,6 +348,56 @@ Call `ScheduleWakeup` to schedule the next run.
   ⚠️ If you omit this echo, all settings revert to defaults from the second wake on. Always serialize and pass the full current effective args (`strength` or individual knobs + `paths`/`risk`).
 - **Save args for resume:** Along with scheduling the wake, write the **same args string** echoed in the prompt to `.jarvis/args` as one line (args only, without the `/jarvis ` prefix). After stopping the loop with an interrupt (Esc) and relaunching with `/loop /jarvis` (no args), procedure 0.4 reads this value and auto-resumes with the same settings.
 - In `reason`, write specifically what is being waited for (e.g., "polling for change accumulation, next check in 4 minutes").
+- **Record liveness (`.jarvis/status`):** Right after `ScheduleWakeup`, convert the next wake time to an epoch and overwrite `.jarvis/status` as one line. `<delay_s>` is the interval just scheduled (seconds), `<interval>` is its label (`active`/`idle`/`debounce`), `<strength>` is the effective strength (may be omitted if only individual knobs were used):
+
+  ```bash
+  mkdir -p .jarvis
+  now=$(date +%s)
+  echo "state=watching next_wake=$((now + <delay_s>)) interval=<interval> strength=<strength> tick=$now" > .jarvis/status
+  ```
+
+  This one line is what backs the statusline's continuous display (watching / stalled?) and stall inference (see "Liveness"). Omit it and the statusline sees only a stale `next_wake` and soon shows "stalled?".
+
+## Liveness (heartbeat + statusline)
+
+So the user can always tell "is it looping right now?", emit the signal in two layers. `/loop` dynamic mode has no resident process — **nothing runs between ticks** — so combine (A) a one-line heartbeat in the tick body and (B) a statusline that's visible between ticks too.
+
+### (A) Tick heartbeat — one line in the body
+Even on a quiet tick (no new change), leave an alive signal **outside** the markers. This one line shows, every tick, "the loop is alive and the next check is when":
+
+```
+⏱ jarvis · alive · next check ~4m (active) · strength=medium
+```
+
+- Render it as **relative (~Nm)**, not an absolute clock (reuse the interval decided in procedure 4 — no `date` math needed).
+- Include the interval label (`active`/`idle`/`debounce`) and the effective strength.
+- **Do not emit the heartbeat on ticks where we're talking (`active_chat == true`)** — the human is present so loop liveness is self-evident, and we don't interrupt the conversation (procedure 0). The continuous signal there is covered by (B) the statusline. The debounce branch's operational message is still left as usual.
+- On a tick that flushed a review, append this heartbeat line **after** the marker-wrapped review body (to give the next-check ETA).
+
+> Procedure 3's "otherwise (no new change)" branch now emits this heartbeat line instead of going silent (skipped while talking).
+
+### (B) Statusline — continuous, visible between ticks too
+Read `.jarvis/status` (written every tick in procedure 4) and paint the watch state in the Claude Code status line **on every render**. It's visible even when no tick is running, and if `next_wake` is long past with no update it even infers **"stalled?"** (= the loop died or was stopped with Esc).
+
+```
+🤖 jarvis · watching · next ~3m (active)              (normal — alive)
+🤖 jarvis · checking…                                 (wake time reached, tick imminent)
+🤖 jarvis · ⚠ stalled? no tick for 11m — /loop /jarvis to resume   (likely dead)
+```
+
+The script ships with this skill: **`assets/statusline.sh`**. If `.jarvis/status` is absent (= watch not running) it prints nothing, so it's harmless to leave always on. Enable it non-destructively by registering it in settings.json **yourself** (install does not touch it automatically):
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/skills/jarvis/assets/statusline.sh"
+  }
+}
+```
+
+- For a project-scoped install, change the path to `.claude/skills/jarvis/assets/statusline.sh`.
+- If you already use another `statusLine`, Claude Code allows only one, so call `bash .../statusline.sh` from inside your existing script and merge its output as one segment.
 
 ## Stop / resume / reset
 

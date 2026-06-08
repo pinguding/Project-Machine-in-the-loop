@@ -9,6 +9,9 @@
 # (고정 라인/파일 임계값은 제거됨 — 직전 리뷰 이후 새 변경이 1줄이라도 쌓이면 게이트 충족.)
 set -uo pipefail
 
+# repo root (captured before we cd into the sandbox) — used to locate statusline.sh
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
+
 SANDBOX="$(mktemp -d)"
 trap 'rm -rf "$SANDBOX"' EXIT
 cd "$SANDBOX"
@@ -137,6 +140,34 @@ ok "$(resolve_args 'strength=low')" "strength=low" "명시 args > 저장 args"
 # (c) 명시 없음 + 저장 없음 → 기본 medium
 rm -f .jarvis/args
 ok "$(resolve_args '')" "strength=medium" "저장 없음 → 기본 medium"
+
+echo "▸ 11. statusline.sh 렌더링 (생존 신호) — .jarvis/status → 감시중/확인중/멈춤?/미가동"
+# SKILL 절차 4가 기록하는 .jarvis/status 한 줄을 statusline.sh가 어떻게 그리는지 검증.
+# en/ko 둘 다 같은 상태 토큰을 읽으므로 en 스크립트로 로직을 본다(문구만 언어별 차이).
+SL="$REPO_DIR/skills/en/jarvis/assets/statusline.sh"
+contains(){ case "$2" in *"$1"*) echo 1;; *) echo 0;; esac; }
+if [ -f "$SL" ]; then
+  now=$(date +%s)
+  # (a) 미래 next_wake → "watching" + 상대 ETA
+  printf 'state=watching next_wake=%s interval=active strength=medium tick=%s\n' "$((now+180))" "$now" > .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'watching' "$out")" 1 "미래 wake → watching"
+  ok "$(contains '~3m' "$out")"     1 "watching → 상대 ETA(~3m) 표기"
+  # (b) 막 지난 wake(grace 안) → "checking…"
+  printf 'state=watching next_wake=%s interval=active strength=high tick=%s\n' "$((now-30))" "$((now-30))" > .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'checking' "$out")" 1 "grace 내 경과 → checking…"
+  # (c) 한참 지난 wake → "stalled?"
+  printf 'state=watching next_wake=%s interval=idle strength=low tick=%s\n' "$((now-700))" "$((now-700))" > .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'stalled' "$out")" 1 "next_wake 한참 경과 → stalled?"
+  # (d) status 파일 없음 → 아무것도 출력 안 함(항상 켜둬도 무해)
+  rm -f .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "${#out}" 0 "status 없음 → 빈 출력"
+else
+  echo "  ⚠ statusline.sh 없음 — 스킵 ($SL)"
+fi
 
 echo ""
 echo "════════════════════════════════════"
