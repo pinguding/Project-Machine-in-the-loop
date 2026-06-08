@@ -1,6 +1,6 @@
 ---
 name: jarvis
-description: A watch loop that polls git change volume in a self-paced manner and automatically runs the jarvis-once one-shot review when new change has accrued since the last review, a risk path changed, or a new commit appeared. There is no fixed line/file threshold. Configure strength preset, polling intervals, paths, and risk paths via args (key=value). When called without args, it asks for strength once on first run. Right after first load it polls quickly for a short while (warmup). Use for "jarvis", "change-detection review loop", "jarvis watch" requests.
+description: A watch loop that polls git change volume in a self-paced manner and automatically runs the jarvis-once one-shot review when new change has accrued since the last review, a risk path changed, or a new commit appeared. Repetition rides on /loop's self-paced mode, so it must be launched as /loop /jarvis. There is no fixed line/file threshold. Configure strength preset, polling intervals, paths, and risk paths via args (key=value). When called without args, it asks for strength once on first run (previous settings auto-restore from .jarvis/args). Right after first load it polls quickly for a short while (warmup). Use for "jarvis", "change-detection review loop", "jarvis watch" requests.
 ---
 
 # jarvis
@@ -13,14 +13,18 @@ A self-paced watch loop that cheaply polls git change volume while a human write
 
 > **Naming:** `jarvis` (this skill) = *the persistent watch loop* (entry point). `jarvis-once` = the *one-shot navigator that runs exactly once* when triggered. When the watch wakes, it calls `jarvis-once`.
 
-## Execution — self-repeating via a single call
+## Execution — self-repeating via `/loop`
 
-This skill **repeats with just a single `/jarvis` call**, without a `/loop` wrapper. The engine of repetition is not the `/loop` command but the `ScheduleWakeup` in procedure 4.
+This skill must be launched as **`/loop /jarvis [args]`**. The engine of repetition is `/loop`'s **self-paced (dynamic) mode**, and on top of it the `ScheduleWakeup` in procedure 4 picks the next tick's interval on its own.
 
-- **Start**: The user calls `/jarvis [args]` once. → Perform this tick and, at the end, always schedule the next run with `ScheduleWakeup` (echoing the current args in the prompt). This schedule is the entry point of the next tick.
+> ⚠️ **`ScheduleWakeup` only works inside `/loop` dynamic mode.** Called from a bare `/jarvis` (i.e. without `/loop`), it returns as if it succeeded but **schedules nothing and is silently ignored.** So if you launch without `/loop`, the loop dies right after the first tick. The entry point is always `/loop /jarvis`.
+
+> ⚠️ **Don't give `/loop` its own interval.** Launch it **without an interval** (`/loop /jarvis`) so it enters dynamic mode and procedure 4's `ScheduleWakeup` (= `active`/`idle`/`debounce`) drives the cadence. Giving `/loop` a fixed interval (`/loop 5m /jarvis`) makes that fixed schedule win and jarvis's `active`/`idle` are **ignored.** Always tune cadence via jarvis args — e.g. `/loop /jarvis active=3m idle=20m` or `/loop /jarvis strength=high`. (On Bedrock/Vertex/Foundry, even a no-interval `/loop` runs on a fixed schedule, so self-pacing does not apply.)
+
+- **Start**: The user calls `/loop /jarvis [args]` once. → Perform this tick and, at the end, always schedule the next run with `ScheduleWakeup` (echoing the current args in the prompt). `/loop` takes this schedule and fires the next tick.
 - **Persist**: When the scheduled wake fires, `/jarvis [args]` runs again and schedules yet another wake. This way the loop is maintained without any further user input.
-- **Invariant**: Unless there is an intent to terminate (see "Stop" below), **every tick must call `ScheduleWakeup` at its end.** Omitting this call kills the loop — since there is no `/loop`, there is no external harness to revive it.
-- Even if the user does call it as `/loop /jarvis`, the behavior is identical (to avoid duplicate scheduling, call `ScheduleWakeup` only once per tick).
+- **Invariant**: Unless there is an intent to terminate (see "Stop" below), **every tick must call `ScheduleWakeup` at its end.** Omitting this call leaves no next wake scheduled and kills the loop.
+- **If launched as a bare `/jarvis` (without `/loop`)**: the skill cannot tell at runtime whether it is inside `/loop` or not. So it performs this one tick normally but, at the end of the first-boot tick output, leaves a notice (procedure 0.7): **"if you launched without `/loop`, this stops after this tick — relaunch as `/loop /jarvis` for continuous watch."** If it was under `/loop` it keeps repeating; if not, it stops here as the notice says.
 
 ## Arguments (args, key=value)
 
@@ -41,13 +45,15 @@ This skill **repeats with just a single `/jarvis` call**, without a `/loop` wrap
 Examples:
 
 ```
-/jarvis                                              # no args → asks for strength once (medium default thereafter)
-/jarvis strength=high                                 # strong — poll tightly (catch new change fast)
-/jarvis strength=low                                  # weak — poll rarely
-/jarvis strength=high idle=30m                        # high preset + override only idle to 30m
-/jarvis paths=src/billing active=3m                   # specific path only, more frequent
-/jarvis risk=**/*payment*,**/*auth*                   # payment/auth warned immediately on a single changed line
+/loop /jarvis                                         # no args → asks for strength once (medium default thereafter)
+/loop /jarvis strength=high                            # strong — poll tightly (catch new change fast)
+/loop /jarvis strength=low                             # weak — poll rarely
+/loop /jarvis strength=high idle=30m                   # high preset + override only idle to 30m
+/loop /jarvis paths=src/billing active=3m              # specific path only, more frequent
+/loop /jarvis risk=**/*payment*,**/*auth*             # payment/auth warned immediately on a single changed line
 ```
+
+> The entry is always `/loop /jarvis` (without `/loop` it does not repeat — see "Execution" above). The `ScheduleWakeup` echo prompt holds just `/jarvis [args]` without the `/loop` prefix — `/loop` fires the next tick with that prompt (procedure 4).
 
 Argument parsing rules:
 - Only `key=value` form is recognized. Unrecognized tokens are ignored and defaults are used.
@@ -89,15 +95,14 @@ If the file does not exist, treat it as `lines=0 risk=0 head= deferred=0 boot=0 
 
 ### Control state files (under `.jarvis/`)
 
-The watch's lifecycle is controlled by the 3 files below. All are under `.jarvis/`, so they are untracked and local-only via `.gitignore`.
+The watch's progress is controlled by the 2 files below. Both are under `.jarvis/`, so they are untracked and local-only via `.gitignore`, and **each is a one-line, fixed-size state file overwritten every tick (not a growing cache).**
 
 | file | role | created/deleted by |
 |------|------|----------------|
-| `.jarvis/baseline` | The watch baseline in the format above. The core of loop progress state. | written every tick / deleted by `/jarvis-stop` |
-| `.jarvis/args` | The effective args string of the previous tick (e.g., `strength=medium`). Updated every tick. `/jarvis-resume` revives with the same settings using this value. Resumes with the default (medium) if absent. | written every tick / deleted by `/jarvis-stop` |
-| `.jarvis/paused` | **Pause flag.** If it exists, a woken tick skips measurement/review/rescheduling entirely and exits immediately (procedure 0.4). baseline/args are preserved, so it can be resumed afterward with `/jarvis-resume`. | created by `/jarvis-pause` / deleted by `/jarvis-resume`·`/jarvis-stop` |
+| `.jarvis/baseline` | The watch baseline in the format above. The core of loop progress state. If it remains on disk, the next `/loop /jarvis` continues watching from that point (= resume). | written every tick / deleted by `/jarvis-reset` |
+| `.jarvis/args` | The effective args string of the previous tick (e.g., `strength=medium`). Updated every tick. If the next start is invoked **with no args**, jarvis reads this value and auto-resumes with the same settings (procedure 0.4). Default (medium) if absent. | written every tick / deleted by `/jarvis-reset` |
 
-> Companion command skills: **`/jarvis-pause`** (stop only the wake loop, preserve state) · **`/jarvis-resume`** (resume the loop) · **`/jarvis-stop`** (stop the loop + delete baseline/args/paused entirely, full reset). See each skill's SKILL.md for details.
+> **Lifecycle (on top of `/loop`):** Start/resume is `/loop /jarvis` — if baseline/args remain, it continues from that state. Stop/pause is interrupting the `/loop` itself (Esc) — no next wake gets scheduled so the loop ends, and baseline/args stay on disk waiting to resume. Full reset is **`/jarvis-reset`** (an independent skill: delete baseline/args → next start is a first boot). Loop termination has no teardown hook, so state cleanup only happens at start time (self-correction) and via `/jarvis-reset`. (The old `.jarvis/paused` flag and `/jarvis-pause`·`/jarvis-resume`·`/jarvis-stop` are no longer used.)
 
 ## Convention document collection (performed only right before calling `jarvis-once`)
 
@@ -171,11 +176,16 @@ If `active_chat == true` and the human is requesting something, **focus on that 
 
 This `active_chat` value is used in the "may speak" decision of procedures 2a/3.
 
-### 0.4. Pause flag check (top priority — takes precedence over all other procedures)
-If the `.jarvis/paused` file exists, this watch is **paused.** This tick **skips measurement/gate/review/baseline-recording entirely** and **does not perform** procedure 4 (`ScheduleWakeup`). Since the schedule disappears, the loop naturally stops.
-- Do **not** delete `.jarvis/baseline`/`.jarvis/args` (preserve state for resume).
-- Notify with only one line: `⏸ Jarvis paused — resume with /jarvis-resume`. (Omit banner, review, and operational messages entirely.)
-- Perform this check before 0.5 (banner) and 0.6 (strength) — output nothing while paused.
+### 0.4. Auto-restore saved settings (on resume)
+If this call has **no recognized args at all** and the `.jarvis/args` file exists, read its one line and use it as this tick's effective args (auto-resume with the previous settings). This way, even after stopping the loop with an interrupt (Esc) and relaunching with `/loop /jarvis` (no args), the previous `strength` etc. are restored — no separate resume command needed.
+
+```bash
+cat .jarvis/args 2>/dev/null || true
+```
+
+- If even one arg was given explicitly, that wins and `.jarvis/args` is not read (**explicit > saved > default medium**).
+- A scheduled-wake (auto-firing) tick always echoes args, so it never enters this branch.
+- If `.jarvis/args` is also absent, fall back to the default (medium). (Restored or not, the effective args decided here are used as-is by 0.6 and procedure 4.)
 
 ### 0.5. Start banner (once on first boot)
 If the `.jarvis/baseline` file **does not exist**, this is the first startup tick → output the `JARVIS` ASCII logo **once in a response-body code fence** per the "Start banner" section rules (outside markers, with caption, always visible). Skip if the file already exists. After outputting the banner, proceed normally with procedures 1–4.
@@ -185,9 +195,20 @@ If the `.jarvis/baseline` file **does not exist**, this is the first startup tic
 - Ask for strength once with `AskUserQuestion`. The choices are 3: `strong (high)` / `medium (medium)` / `weak (low)`, plus a knob summary of each preset in the description. (The user can also give a value directly via "Other.")
 - Confirm the value the user picked as this tick's `strength`, and echo `strength=<chosen value>` in procedure 4's wake-schedule prompt. From the next wake on, args are non-empty so it does not ask again.
 - **Never ask on a scheduled-wake (auto-firing) tick** — args (including `strength=`) are always echoed, so it never enters this branch. This prevents the loop from being blocked by a question while the user is away.
-- If there is even one arg (e.g., `/jarvis strength=high`, `/jarvis idle=30m`), use that value as-is without asking.
+- If there is even one arg (e.g., `/loop /jarvis strength=high`, `/loop /jarvis idle=30m`), use that value as-is without asking.
 
-> This question is only "once when first turned on." To change strength later, call it again with `/jarvis strength=<value>` (it overwrites the in-progress schedule).
+> This question is only "once when first turned on." To change strength later, call it again with `/loop /jarvis strength=<value>` (it overwrites the in-progress schedule).
+
+### 0.7. `/loop` notice (once on first boot — for the bare-call case)
+**Condition:** Perform only when this is the first startup tick (baseline-absent decision at `0.5`). (Not output on scheduled-wake or later ticks.)
+- The skill cannot tell at runtime whether it is running inside `/loop` or was launched as a bare `/jarvis`. So on the first boot tick it always leaves a one-line notice **outside** the markers:
+
+  ```
+  ↻ Continuous watch requires launching as /loop /jarvis. If launched without /loop, it stops after this one tick.
+  ```
+
+- This notice is informational. If it was running under `/loop`, `ScheduleWakeup` in procedure 4 works and it keeps repeating (the notice is harmless); if it was a bare call, `ScheduleWakeup` is silently ignored and it stops after this tick as the notice says.
+- Procedures 1–4 proceed as usual (this one tick runs normally).
 
 ### 1. Measure (low cost)
 If `paths` is set, append `-- <paths>` to measure working-tree change volume. Count both **tracked-file changes** and **untracked (newly created) files**:
@@ -223,6 +244,15 @@ git rev-parse HEAD
 
 ### 2. Boundary decision (auto-correct for commits/discards)
 Read `base_lines`, `base_risk`, `base_head` from `.jarvis/baseline`.
+
+**(0) Stale-baseline self-correction (resume hygiene — a light one-time check):**
+After stopping the loop with an interrupt (Esc), doing a rebase/reset/branch-delete outside can leave `base_head` pointing at a **SHA that no longer exists in the repo.** When `base_head` is non-empty, verify its existence once:
+
+```bash
+git cat-file -e <base_head>^{commit} 2>/dev/null   # exit 0 if it exists
+```
+
+→ **If it does not exist** (non-zero exit), the previous baseline has lost its meaning. Do not treat this tick as a first boot (no banner re-output); silently **reset the baseline to current measured values** (`lines=cur_lines risk=risk_lines head=cur_head deferred=0`, preserving `boot`/`mirrored`). Do not run `jarvis-once`; go to procedure 4. (Commit-boundary and discard correction are meaningful only when head is valid, so this fires first to avoid running (a)/(b) on an invalid head.) If `base_head` is empty, skip this check.
 
 **(a) Commit boundary — forced observation (always on):**
 If `base_head` is non-empty and `cur_head != base_head`, a **new commit was made** since the previous tick (commit/merge). Check once with `jarvis-once` regardless of volume.
@@ -315,24 +345,24 @@ Call `ScheduleWakeup` to schedule the next run.
   ```
 
   ⚠️ If you omit this echo, all settings revert to defaults from the second wake on. Always serialize and pass the full current effective args (`strength` or individual knobs + `paths`/`risk`).
-- **Save args for resume:** Along with scheduling the wake, write the **same args string** echoed in the prompt to `.jarvis/args` as one line (args only, without the `/jarvis ` prefix). `/jarvis-resume` reads this value to revive the loop with the same settings.
+- **Save args for resume:** Along with scheduling the wake, write the **same args string** echoed in the prompt to `.jarvis/args` as one line (args only, without the `/jarvis ` prefix). After stopping the loop with an interrupt (Esc) and relaunching with `/loop /jarvis` (no args), procedure 0.4 reads this value and auto-resumes with the same settings.
 - In `reason`, write specifically what is being waited for (e.g., "polling for change accumulation, next check in 4 minutes").
 
-## Stop / pause / resume
+## Stop / resume / reset
 
-The three actions are split into separate command skills. They are also triggered by natural language ("stop jarvis," etc.), but explicit invocation is recommended.
+Since `/loop` is the engine, the lifecycle rides on `/loop`'s own lifecycle. There are no separate pause/resume commands.
 
-| command | action | state files | resume |
-|------|------|-----------|------|
-| **`/jarvis-pause`** | Stop only the wake loop (no measurement/review). Preserve progress state. | create `.jarvis/paused`, **keep** baseline/args | resume with the same settings via `/jarvis-resume` |
-| **`/jarvis-resume`** | Clear pause + restart loop. Restore settings from `.jarvis/args`. | delete `.jarvis/paused` | — |
-| **`/jarvis-stop`** | Stop loop + **full reset**. Next time it starts like a first boot (banner/strength question reappear). | delete `.jarvis/baseline`·`.jarvis/args`·`.jarvis/paused` entirely | start fresh with `/jarvis` |
+| action | how | state (`.jarvis/`) |
+|------|------|------------------|
+| **Start · resume** | `/loop /jarvis [args]` | if baseline/args remain, continue from that point. Launched with no args, `.jarvis/args` auto-restores (procedure 0.4) |
+| **Stop · pause** | interrupt the `/loop` (Esc) | untouched — baseline/args preserved, waiting to resume |
+| **Full reset** | **`/jarvis-reset`** (independent skill) | delete `.jarvis/baseline`·`.jarvis/args` → next start is a first boot (banner/strength question) |
 
 How it works:
-- **Pause (light yielding)**: If the user simply sends another message, that turn yields to discussion/implementation per procedure 0 (the watch itself stays alive). This is an implicit yielding that happens without a command.
-- **`/jarvis-pause`**: Creates `.jarvis/paused`. Even if an already-scheduled wake fires once more, it exits immediately at procedure 0.4 and **does not reschedule**, so the loop stops. Since baseline/args remain intact, it can be resumed without loss.
-- **`/jarvis-stop`**: Deletes all `.jarvis/` state files and does not reschedule. With no schedule, the loop naturally stops. ("stop jarvis," "stop the watch," "stop loop" are handled the same way.)
-- **`/jarvis-resume`**: Deletes `.jarvis/paused` and re-calls `Skill('jarvis')` with the saved args to run the first tick. That tick re-arms `ScheduleWakeup` at procedure 4, and the loop continues.
+- **Light yielding (implicit)**: If the user simply sends another message, that turn yields to discussion/implementation per procedure 0 (the watch itself stays alive). An implicit yielding that happens without a command.
+- **Stop/pause = interrupt the loop (Esc)**: In `/loop` dynamic mode, the next tick exists only when `ScheduleWakeup` is called. Interrupting the loop means no next wake is scheduled, so the loop ends. baseline·args stay on disk, so it waits to resume without loss. (Loop termination has no teardown hook — no cleanup code can run at end time, which is why there is no separate pause flag.)
+- **Resume = `/loop /jarvis`**: Relaunching finds the baseline, so it skips the banner and strength question (procedures 0.5·0.6); launched with no args, procedure 0.4 restores `.jarvis/args` and continues with the same settings. Even if you rebased/reset outside, procedure 2(0) stale self-correction silently realigns an invalid head to current values.
+- **`/jarvis-reset`**: An **independent command** that deletes `.jarvis/baseline`·`.jarvis/args`. It does not stop a running loop (that's Esc) — use it to clear state when you want a fresh start after stopping. ("reset jarvis," "start over" are handled the same way. "just stop" → Esc guidance.)
 
 ## Cost guide (for user information)
 

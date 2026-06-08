@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/pinguding/Project-Machine-in-the-loop.git"
-SKILLS=(jarvis jarvis-once jarvis-pause jarvis-resume jarvis-stop)
+SKILLS=(jarvis jarvis-once jarvis-reset)
 
 # ---- colors ----
 if [ -t 1 ]; then B=$'\033[1m'; G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; D=$'\033[2m'; R=$'\033[0m'; else B=; G=; C=; Y=; D=; R=; fi
@@ -153,16 +153,19 @@ say ""
 say "${G}${B}Done.${R}"
 say ""
 if [ "$MODE" = "global" ]; then
-  say "  You can now start the watch with ${C}/jarvis${R} in ${C}any project${R}."
+  say "  You can now start the watch with ${C}/loop /jarvis${R} in ${C}any project${R}."
 else
-  say "  Open Claude Code in that project and run ${C}/jarvis${R}."
+  say "  Open Claude Code in that project and run ${C}/loop /jarvis${R}."
 fi
 cat <<EOF
 
-  ${C}/jarvis${R}                    asks for strength once, then starts the watch
-  ${C}/jarvis strength=high${R}      check small changes often
-  ${C}/jarvis mirror=off${R}         turn off the gray-zone mirror
-  ${C}/jarvis-pause${R} ${D}|${R} ${C}-resume${R} ${D}|${R} ${C}-stop${R}
+  ${C}/loop /jarvis${R}                 asks for strength once, then starts the watch
+  ${C}/loop /jarvis strength=high${R}   check small changes often
+  ${C}/loop /jarvis mirror=off${R}      turn off the gray-zone mirror
+
+  stop/pause  ${D}→${R} interrupt the loop (Esc)
+  resume      ${D}→${R} ${C}/loop /jarvis${R} again (restores saved settings)
+  full reset  ${D}→${R} ${C}/jarvis-reset${R}
 
   Personalize:
   ${D}·${R} .claude/skills/jarvis-once/persona.md   navigator's character & focus (ships empty)

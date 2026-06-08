@@ -157,7 +157,7 @@
       의미 있는 순간에만 페어 내비게이터 <b>Jarvis</b>를 자동으로 깨우는 워치 루프입니다.
       코드는 사람이 쓰고, AI는 관찰자로 머뭅니다.</p>
     <div class="cta">
-      <span class="pill key">/jarvis</span>
+      <span class="pill key">/loop /jarvis</span>
       <span class="pill">strength=medium</span>
       <span class="pill">risk=**/*payment*</span>
       <span class="pill">debounce=90s</span>
@@ -302,7 +302,7 @@
         <h3>컨벤션 수집 → Jarvis</h3><p>변경 파일의 AGENTS.md·README·경로별 rules를 모아 맥락으로 넘기고 Jarvis를 호출. 결과는 마커로 감싼다.</p>
       </div></div>
       <div class="step"><div class="num">5</div><div class="body">
-        <h3>다음 wake 예약</h3><p><code>ScheduleWakeup</code>으로 스스로 다음 실행을 건다. <code>/loop</code> 래퍼 없이 단독 자기 반복.</p>
+        <h3>다음 wake 예약</h3><p><code>ScheduleWakeup</code>으로 다음 실행 간격을 스스로 정한다. <code>/loop</code>의 self-paced 모드 위에서 돈다 — <code>/loop /jarvis</code>로 띄운다.</p>
       </div></div>
     </div>
   </section>
@@ -328,8 +328,8 @@
         <h3>컨벤션 자동 수집</h3>
         <p>변경 파일의 가장 가까운 AGENTS.md·디렉토리 README·경로별 팀 rules를 모아 Jarvis에 주입. "이 패키지 규칙"까지 알고 리뷰.</p></div>
       <div class="feat"><span class="tag">LOOP</span><span class="ic">♾️</span>
-        <h3>단독 자기 반복</h3>
-        <p><code>ScheduleWakeup</code>이 반복의 엔진. <code>/loop</code>을 앞에 붙이지 않아도 <b>한 번 호출로 스스로 돈다.</b></p></div>
+        <h3>self-paced 워치</h3>
+        <p><code>/loop /jarvis</code>로 띄우면 <code>ScheduleWakeup</code>이 다음 간격을 스스로 정해 <b>추가 입력 없이 계속 감시한다.</b></p></div>
       <div class="feat"><span class="tag">PERSONA</span><span class="ic">🎭</span>
         <h3>내비게이터 개인화</h3>
         <p>빈 <code>persona.md</code>를 채워 Jarvis가 <b>누구처럼, 무엇에 예민하게</b> 볼지 정한다. 두루뭉술한 보편 맥락이 아니라 내 손에 맞춘 navigation.</p></div>
@@ -367,7 +367,8 @@
   <section>
     <div class="eyebrow">설정</div>
     <h2>args 한 줄로 튜닝</h2>
-    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/jarvis strength=high risk=**/*payment* debounce=90s</code></p>
+    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/loop /jarvis strength=high risk=**/*payment* debounce=90s</code></p>
+    <p style="opacity:.85">⚠️ <code>/loop</code>에 간격을 직접 주지 말 것. <code>/loop /jarvis</code>처럼 간격 없이 띄워야 self-pace로 돌아 <code>active</code>/<code>idle</code>/<code>strength</code> args가 <code>ScheduleWakeup</code>으로 주기를 몬다. <code>/loop 5m /jarvis</code>는 고정 스케줄로 돌아 이 args를 <b>무시</b>한다.</p>
     <table>
       <tr><th>키</th><th>의미</th><th>기본값</th></tr>
       <tr><td><code>strength</code></td><td class="desc">강도 프리셋 — 아래 폴링 간격 노브들을 묶어 세팅 (low/medium/high)</td><td><span class="def">medium</span></td></tr>

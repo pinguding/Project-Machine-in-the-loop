@@ -157,7 +157,7 @@
       watching the changes and automatically waking the pair navigator <b>Jarvis</b> only at the moments that matter.
       The human writes the code; the AI stays an observer.</p>
     <div class="cta">
-      <span class="pill key">/jarvis</span>
+      <span class="pill key">/loop /jarvis</span>
       <span class="pill">strength=medium</span>
       <span class="pill">risk=**/*payment*</span>
       <span class="pill">debounce=90s</span>
@@ -303,7 +303,7 @@
         <h3>Gather conventions → Jarvis</h3><p>Collect the changed files' AGENTS.md, README, and per-path rules, pass them as context, and call Jarvis. The result is wrapped in markers.</p>
       </div></div>
       <div class="step"><div class="num">5</div><div class="body">
-        <h3>Schedule the next wake</h3><p>It schedules its own next run with <code>ScheduleWakeup</code>. Self-repeating on its own, with no <code>/loop</code> wrapper.</p>
+        <h3>Schedule the next wake</h3><p>It picks its own next interval with <code>ScheduleWakeup</code>, riding on <code>/loop</code>'s self-paced mode. Launch it as <code>/loop /jarvis</code>.</p>
       </div></div>
     </div>
   </section>
@@ -329,8 +329,8 @@
         <h3>Automatic convention gathering</h3>
         <p>It gathers the changed files' nearest AGENTS.md, directory README, and per-path team rules and injects them into Jarvis. It reviews knowing even "this package's rules."</p></div>
       <div class="feat"><span class="tag">LOOP</span><span class="ic">♾️</span>
-        <h3>Standalone self-repetition</h3>
-        <p><code>ScheduleWakeup</code> is the engine of the loop. Without prefixing <code>/loop</code>, <b>one call and it runs on its own.</b></p></div>
+        <h3>Self-paced watch</h3>
+        <p>Launched as <code>/loop /jarvis</code>, <code>ScheduleWakeup</code> picks each next interval itself — <b>it keeps watching with no further input.</b></p></div>
       <div class="feat"><span class="tag">PERSONA</span><span class="ic">🎭</span>
         <h3>Navigator personalization</h3>
         <p>Fill in the empty <code>persona.md</code> to set <b>who Jarvis looks like, and what it's sensitive to.</b> Navigation tuned to your own hands, not a vague, universal context.</p></div>
@@ -368,7 +368,8 @@ which could lead to a crash — worth checking this path on empty input.
   <section>
     <div class="eyebrow">Configuration</div>
     <h2>Tune it in a single line of args</h2>
-    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/jarvis strength=high risk=**/*payment* debounce=90s</code></p>
+    <p class="lead"><code style="font-family:var(--mono);color:var(--gold)">/loop /jarvis strength=high risk=**/*payment* debounce=90s</code></p>
+    <p style="opacity:.85">⚠️ Don't give <code>/loop</code> its own interval. Launch as <code>/loop /jarvis</code> (no interval) so it self-paces — the <code>active</code>/<code>idle</code>/<code>strength</code> args drive the cadence via <code>ScheduleWakeup</code>. <code>/loop 5m /jarvis</code> runs on a fixed schedule and <b>ignores</b> them.</p>
     <table>
       <tr><th>Key</th><th>Meaning</th><th>Default</th></tr>
       <tr><td><code>strength</code></td><td class="desc">Strength preset — bundles the polling-interval knobs below (low/medium/high)</td><td><span class="def">medium</span></td></tr>

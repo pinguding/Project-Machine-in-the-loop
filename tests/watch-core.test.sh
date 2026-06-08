@@ -3,8 +3,9 @@
 # 실제 git 명령으로 샌드박스 레포에서 재현해 검증한다.
 #
 # 모델이 해석하는 부분(navigator 리뷰, debounce/active_chat, mirror, ScheduleWakeup)은
-# 여기서 테스트하지 않는다 — 그건 실제 /jarvis 호출에서만 검증 가능하다.
-# 여기서 보는 것: shortstat 파싱, delta 계산, 새 변경 게이트/위험 게이트, 커밋경계·되돌림 감지.
+# 여기서 테스트하지 않는다 — 그건 실제 /loop /jarvis 호출에서만 검증 가능하다.
+# 여기서 보는 것: shortstat 파싱, delta 계산, 새 변경 게이트/위험 게이트, 커밋경계·되돌림 감지,
+#   stale base_head 자가보정(절차 2(0)), no-arg 시 .jarvis/args 자동 복원(절차 0.4).
 # (고정 라인/파일 임계값은 제거됨 — 직전 리뷰 이후 새 변경이 1줄이라도 쌓이면 게이트 충족.)
 set -uo pipefail
 
@@ -97,6 +98,45 @@ ok "$local_lines" 15 "baseline lines 파싱"
 ok "$local_boot" 3 "baseline boot 파싱"
 ok "$local_mirrored" 0 "baseline mirrored 파싱(신규 필드)"
 ok "$local_head" "$cur_head" "baseline head 파싱"
+
+echo "▸ 9. stale base_head 자가보정 (절차 2(0)) — 레포에 없는 SHA면 baseline 리셋"
+# SKILL: base_head가 비어있지 않을 때 `git cat-file -e <base_head>^{commit}`로 존재 확인.
+#        존재하지 않으면(rebase/reset/branch 삭제) baseline을 현재값으로 조용히 리셋.
+head_exists(){ git cat-file -e "$1^{commit}" 2>/dev/null && echo 1 || echo 0; }
+# (a) 유효한 head → 존재 → 리셋 안 함
+ok "$(head_exists "$cur_head")" 1 "valid base_head 존재 인식"
+# (b) 레포에 없는 SHA → 미존재 → stale
+bogus="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+ok "$(head_exists "$bogus")" 0 "stale base_head 미존재 인식"
+# (c) stale 감지 시 baseline을 현재 측정값으로 리셋하는 분기
+printf 'line\n%.0s' {1..7} > a.txt   # 현재 워킹트리 변경 7라인
+read -r cf cl < <(measure)
+base_head="$bogus"
+if [ -n "$base_head" ] && [ "$(head_exists "$base_head")" = 0 ]; then
+  # 리셋: lines=cur_lines head=cur_head deferred=0 (boot/mirrored 보존), jarvis-once 미실행
+  reset_lines=$cl; reset_head="$(git rev-parse HEAD)"; reset_did_review=0
+fi
+ok "${reset_lines:-X}" "$cl" "stale → baseline.lines = cur_lines 로 리셋"
+ok "${reset_head:-X}" "$(git rev-parse HEAD)" "stale → baseline.head = cur_head 로 리셋"
+ok "${reset_did_review:-X}" 0 "stale 리셋 시 jarvis-once 미실행"
+git checkout -q -- a.txt 2>/dev/null; rm -f a.txt
+
+echo "▸ 10. no-arg 시작 → .jarvis/args 자동 복원 (절차 0.4) — 명시 > 저장 > 기본"
+mkdir -p .jarvis
+# SKILL 절차 0.4: 인식된 args가 하나도 없고 .jarvis/args가 있으면 그 값을 유효 args로.
+resolve_args(){ # $1 = 명시적으로 받은 args (없으면 빈 문자열)
+  if [ -n "$1" ]; then printf '%s' "$1"
+  elif [ -f .jarvis/args ]; then cat .jarvis/args
+  else printf 'strength=medium'; fi
+}
+printf 'strength=high idle=30m' > .jarvis/args
+# (a) 명시 args 없음 + 저장 있음 → 저장값 복원 (재개)
+ok "$(resolve_args '')" "strength=high idle=30m" "no-arg → .jarvis/args 복원"
+# (b) 명시 args 있음 → 저장 무시, 명시 우선
+ok "$(resolve_args 'strength=low')" "strength=low" "명시 args > 저장 args"
+# (c) 명시 없음 + 저장 없음 → 기본 medium
+rm -f .jarvis/args
+ok "$(resolve_args '')" "strength=medium" "저장 없음 → 기본 medium"
 
 echo ""
 echo "════════════════════════════════════"

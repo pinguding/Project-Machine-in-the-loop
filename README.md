@@ -12,7 +12,7 @@ The human writes the code; the AI stays an observer.
 
 🔗 **[View on the web](https://pinguding.github.io/Project-Machine-in-the-loop/)**
 
-`/jarvis`  ·  `strength=medium`  ·  `risk=**/*payment*`  ·  `debounce=90s`
+`/loop /jarvis`  ·  `strength=medium`  ·  `risk=**/*payment*`  ·  `debounce=90s`
 
 </div>
 
@@ -192,10 +192,11 @@ new change has accrued since the last review, a risk path changed, or a commit b
 2. **Boundary check** — Was there a new commit? Was a change reverted? Auto-corrects by comparing against the marker (`.jarvis/baseline`).
 3. **Gate + debounce** — if any of new-change / risk / commit-boundary is met, it's review-worthy. But **if a conversation is live, defer**, and flush the accrued change at once when it goes quiet.
 4. **Collect conventions & personalization → Jarvis** — gather the changed files' AGENTS.md / README / path rules + persona + focus area, pass them as context, and call Jarvis. The result is wrapped in markers.
-5. **Schedule the next wake** — uses `ScheduleWakeup` to queue its own next run. A standalone self-loop, with no `/loop` wrapper.
+5. **Schedule the next wake** — uses `ScheduleWakeup` to pick its own next run. Launch it as `/loop /jarvis` so the loop keeps going.
 
-> The engine of repetition is **`ScheduleWakeup`**, not `/loop`. Every tick must schedule the next wake at its end, and
-> stopping is simply "not rescheduling" (which is what `/jarvis-pause` and `/jarvis-stop` do).
+> Repetition rides on **`/loop`'s self-paced mode**, with `ScheduleWakeup` picking each interval. `ScheduleWakeup` only fires
+> inside `/loop`, so the entry is always **`/loop /jarvis`**. Every tick schedules the next wake at its end, and
+> stopping is simply interrupting the `/loop` (Esc) — no next wake gets scheduled. Re-running `/loop /jarvis` resumes; `/jarvis-reset` wipes state.
 
 ---
 
@@ -208,7 +209,7 @@ new change has accrued since the last review, a risk path changed, or a commit b
 | 🔒 | **Forced commit-boundary watch** | When a new commit is detected, it checks once regardless of accrued volume. **Right before a mistake is sealed into code** is the golden moment to warn. |
 | ⏸️ | **Conversation debounce** | During live conversation it defers the review, then handles the accrued change at once when things go quiet. **It doesn't break your flow.** |
 | 📚 | **Automatic convention collection** | Gathers the changed files' nearest AGENTS.md, directory README, and path-specific team rules. Reviews knowing even "this package's rules." |
-| ♾️ | **Standalone self-loop** | `ScheduleWakeup` is the engine of repetition. With no `/loop`, **one call and it runs on its own.** |
+| ♾️ | **Self-paced watch** | Launched as `/loop /jarvis`, `ScheduleWakeup` picks each next interval itself — **it keeps watching with no further input.** |
 | 🎭 | **Navigator personalization** | Fill in the empty `persona.md` to set **who** Jarvis is like and **what** it's sensitive to. |
 | 🔬 | **Focus area** | Drop "what to watch especially in this project" into `.claude/jarvis/focus/`, and it's seen as a **priority lens** ahead of the generic catalog. |
 | 🪞 | **gray-zone mirror** | When a large share of accrued change is **generated code**, it holds up one line — "did you actually grasp it?" It neither blocks nor fixes; just the mirror. |
@@ -238,11 +239,9 @@ switches to implementation **only when the human delegates** — "fix this for m
 
 | Skill | Role |
 |------|------|
-| **jarvis** | The entry-point watch loop. Polls cheaply with `git diff`, and when new change accrues / a risk-path changes / a commit-boundary is crossed, calls `jarvis-once` and schedules its own next tick with `ScheduleWakeup`. |
+| **jarvis** | The entry-point watch loop. Launched as `/loop /jarvis`. Polls cheaply with `git diff`, and when new change accrues / a risk-path changes / a commit-boundary is crossed, calls `jarvis-once` and picks its next tick with `ScheduleWakeup`. |
 | **jarvis-once** | The single-shot pair navigator. Only reviews, flags, and suggests next steps — **never writes code directly.** |
-| **jarvis-pause** | Stops only the wake loop. Preserves baseline & args, so `/jarvis-resume` continues from where it left off. |
-| **jarvis-resume** | Resumes the loop with the saved settings. |
-| **jarvis-stop** | Stops the loop and deletes the state files for a full reset. |
+| **jarvis-reset** | Independent command that deletes the `.jarvis/` state (baseline & args) for a full reset. Does not stop a running loop (that's Esc); use it for a clean start afterward. |
 
 State is stored in the working tree's `.jarvis/` (gitignored, an independent local state per clone). It avoids `.git/`
 because writing inside `.git/` prompts for permission every time — unfit for an unattended loop.
@@ -257,7 +256,7 @@ documents the project actually has** (CLAUDE.md, AGENTS.md, path-specific rules,
 - **`.claude/skills/jarvis-once/persona.md`** — defines *who* the navigator is + *what* it's sensitive to.
   **Ships empty**; fill it and the review's character shifts to the person/team. (Empty → the default navigator.)
 - **`.claude/jarvis/focus/`** — a directory collecting what to review *especially carefully in this project.*
-  Seen ahead of the generic detection catalog. Can be committed and shared with the team. Relocate with `/jarvis focus=<path>`.
+  Seen ahead of the generic detection catalog. Can be committed and shared with the team. Relocate with `/loop /jarvis focus=<path>`.
 
 Whatever you personalize, the core rules — **"no code production · neither spoon-feed nor quiz"** — always hold.
 
@@ -266,7 +265,7 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 ## Configuration — tune with one line of args
 
 ```
-/jarvis strength=high risk=**/*payment* debounce=90s
+/loop /jarvis strength=high risk=**/*payment* debounce=90s
 ```
 
 | Key | Meaning | Default |
@@ -289,13 +288,18 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 ## Usage
 
 ```
-/jarvis                      # asks for a strength once, then starts the watch
-/jarvis strength=high        # check small changes often
-/jarvis strength=low         # only large chunks, rarely
-/jarvis risk=**/*payment*    # risk paths warn immediately, regardless of volume
-/jarvis mirror=off           # turn off the gray-zone mirror (on by default)
-/jarvis-pause | /jarvis-resume | /jarvis-stop
+/loop /jarvis                # asks for a strength once, then starts the watch
+/loop /jarvis strength=high   # check small changes often
+/loop /jarvis strength=low    # only large chunks, rarely
+/loop /jarvis risk=**/*payment*  # risk paths warn immediately, regardless of volume
+/loop /jarvis mirror=off      # turn off the gray-zone mirror (on by default)
+
+# stop/pause  → interrupt the loop (Esc)
+# resume      → /loop /jarvis again (restores saved settings)
+# full reset  → /jarvis-reset
 ```
+
+> ⚠️ **Don't give `/loop` its own interval.** Launch as `/loop /jarvis` (no interval) so it self-paces — jarvis's `active`/`idle`/`strength` args drive the cadence via `ScheduleWakeup`. `/loop 5m /jarvis` runs on a fixed schedule and **ignores** those args. Tune the interval the usual way: `/loop /jarvis active=3m idle=20m`.
 
 ### Install
 
@@ -318,7 +322,7 @@ git clone https://github.com/pinguding/Project-Machine-in-the-loop.git
 ./Project-Machine-in-the-loop/install.sh --global         # into ~/.claude/skills/ (every project)
 ```
 
-Then open Claude Code in that project and run `/jarvis`. Re-running is safe (idempotent) and updates the skills in place.
+Then open Claude Code in that project and run `/loop /jarvis`. Re-running the installer is safe (idempotent) and updates the skills in place.
 
 > Skill sources live **in the open** under `skills/en/` and `skills/ko/` (not hidden in `.claude/`). The installer
 > copies the language you pick into the target's `.claude/skills/`, which is where Claude Code discovers them.
