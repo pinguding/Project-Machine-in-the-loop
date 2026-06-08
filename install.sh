@@ -36,6 +36,7 @@ ${B}jarvis installer${R} — Machine in the Loop
   ${C}./install.sh --global${R}            ~/.claude/skills/ (every project)
   ${C}./install.sh --lang en|ko${R}        pick skill language (skip the prompt)
   ${C}./install.sh --version <ref>${R}     install a specific tag, branch, or commit
+  ${C}./install.sh --no-settings${R}       skip auto-configuring settings.json (statusline/hook/perms)
   ${C}./install.sh --help${R}
 
   ${D}<ref> is any git tag (e.g. 1.0.0), branch (main), or commit SHA.${R}
@@ -46,7 +47,7 @@ EOF
 }
 
 # ---- args ----
-MODE="project"; TARGET="."; LANGSEL=""; VERSION=""
+MODE="project"; TARGET="."; LANGSEL=""; VERSION=""; SETTINGS=1
 while [ $# -gt 0 ]; do
   case "$1" in
     -g|--global)        MODE="global"; shift;;
@@ -56,6 +57,7 @@ while [ $# -gt 0 ]; do
     --ko)               LANGSEL="ko"; shift;;
     -v|--version|--ref) VERSION="${2:-}"; shift 2;;
     --version=*|--ref=*) VERSION="${1#*=}"; shift;;
+    --no-settings)      SETTINGS=0; shift;;
     -h|--help)          usage; exit 0;;
     -*)                 say "${Y}Unknown option: $1${R}"; usage; exit 1;;
     *)                  TARGET="$1"; shift;;
@@ -148,16 +150,86 @@ if [ "$MODE" = "project" ]; then
   fi
 fi
 
-# ---- done ----
-# asset paths (for the optional liveness hints below)
+# ---- configure settings.json (statusline + stop hook + benign-command allowlist) ----
+# Absolute command paths so they resolve from any cwd/context.
+SL_CMD="bash $DEST/jarvis/assets/statusline.sh"
+HK_CMD="bash $DEST/jarvis/assets/loop-watch-hook.sh"
 if [ "$MODE" = "global" ]; then
-  STATUSLINE='~/.claude/skills/jarvis/assets/statusline.sh'
-  HOOK='~/.claude/skills/jarvis/assets/loop-watch-hook.sh'
+  SETTINGS_FILE="$HOME/.claude/settings.json"
 else
-  STATUSLINE='.claude/skills/jarvis/assets/statusline.sh'
-  HOOK='.claude/skills/jarvis/assets/loop-watch-hook.sh'
+  # project: personal, never-committed settings (matches .jarvis being gitignored)
+  SETTINGS_FILE="$TARGET/.claude/settings.local.json"
+fi
+# Commands the watch runs every tick — allow them so the loop runs unattended.
+PERMS='Bash(git:*) Bash(cat:*) Bash(date:*) Bash(echo:*) Bash(printf:*) Bash(mkdir:*) Bash(wc:*) Bash(sed:*) Bash(awk:*) Bash(grep:*)'
+
+CONFIGURED=""; SETTINGS_WARN=""
+if [ "$SETTINGS" = "1" ] && command -v python3 >/dev/null 2>&1; then
+  mkdir -p "$(dirname "$SETTINGS_FILE")"
+  # Write the merge script to a temp file (heredoc-inside-$() is unreliable on bash 3.2/macOS).
+  PYTMP="$(mktemp)"
+  cat > "$PYTMP" <<'PY'
+import json, os, sys
+path   = sys.argv[1]
+sl_cmd = os.environ["SL_CMD"]; hk_cmd = os.environ["HK_CMD"]
+perms  = os.environ["PERMS"].split()
+
+data = {}
+if os.path.exists(path):
+    with open(path) as f:
+        txt = f.read().strip()
+    if txt:
+        try:
+            data = json.loads(txt)
+            if not isinstance(data, dict): data = {}
+        except Exception:
+            print("PARSE_ERROR"); sys.exit(0)   # malformed → leave untouched
+
+msgs = []
+
+# statusLine — never clobber a user's existing one
+sl = data.get("statusLine")
+if sl is None:
+    data["statusLine"] = {"type": "command", "command": sl_cmd}; msgs.append("statusLine: set")
+elif isinstance(sl, dict) and sl.get("command") == sl_cmd:
+    msgs.append("statusLine: already set")
+else:
+    msgs.append("statusLine: kept existing (compose jarvis statusline.sh in by hand if wanted)")
+
+# hooks — append ours if absent, preserve any others
+hooks = data.setdefault("hooks", {})
+def ensure(event):
+    arr = hooks.setdefault(event, [])
+    if not isinstance(arr, list): return False
+    for g in arr:
+        for h in (g or {}).get("hooks", []):
+            if (h or {}).get("command") == hk_cmd: return False
+    arr.append({"hooks": [{"type": "command", "command": hk_cmd}]}); return True
+added_hook = ensure("Stop") | ensure("StopFailure")
+msgs.append("hooks: Stop/StopFailure " + ("added" if added_hook else "already set"))
+
+# permissions.allow — union, no duplicates
+p = data.setdefault("permissions", {})
+allow = p.setdefault("allow", [])
+if isinstance(allow, list):
+    added = [r for r in perms if r not in allow]
+    allow.extend(added)
+    msgs.append(("permissions.allow: +%d" % len(added)) if added else "permissions.allow: already set")
+
+with open(path, "w") as f:
+    json.dump(data, f, indent=2); f.write("\n")
+print("\n".join(msgs))
+PY
+  MERGE_OUT="$(SL_CMD="$SL_CMD" HK_CMD="$HK_CMD" PERMS="$PERMS" python3 "$PYTMP" "$SETTINGS_FILE" 2>/dev/null)" || MERGE_OUT="PARSE_ERROR"
+  rm -f "$PYTMP"
+  if [ "$MERGE_OUT" = "PARSE_ERROR" ] || [ -z "$MERGE_OUT" ]; then
+    SETTINGS_WARN="$SETTINGS_FILE is not valid JSON — left untouched"
+  else
+    CONFIGURED="$MERGE_OUT"
+  fi
 fi
 
+# ---- done ----
 say ""
 say "${G}${B}Done.${R}"
 say ""
@@ -175,18 +247,28 @@ cat <<EOF
   stop/pause  ${D}→${R} interrupt the loop (Esc)
   resume      ${D}→${R} ${C}/loop /jarvis${R} again (restores saved settings)
   full reset  ${D}→${R} ${C}/jarvis-reset${R}
+EOF
 
-  Optional — ${B}always-on liveness in the status line${R} (watching / next check / ⚠ stalled?):
-  add this to your ${C}settings.json${R} (not changed automatically):
-    ${D}"statusLine": { "type": "command", "command": "bash ${STATUSLINE}" }${R}
-  ${D}prints nothing when the watch isn't running, so it's safe to leave on.${R}
+if [ -n "$CONFIGURED" ]; then
+  say ""
+  ok "settings configured → ${C}$SETTINGS_FILE${R}"
+  printf '%s\n' "$CONFIGURED" | while IFS= read -r line; do info "$line"; done
+  info "restart Claude Code (hooks & statusLine load at session start)"
+else
+  say ""
+  if [ "$SETTINGS" = "0" ]; then
+    info "settings.json left untouched (--no-settings). Enable liveness manually:"
+  elif [ -n "$SETTINGS_WARN" ]; then
+    info "$SETTINGS_WARN. Enable liveness manually:"
+  else
+    info "python3 not found — settings.json not auto-configured. Add manually:"
+  fi
+  printf '    %s"statusLine": { "type": "command", "command": "%s" }%s\n' "$D" "$SL_CMD" "$R"
+  printf '    %s"hooks": { "Stop": [ { "hooks": [ { "type":"command","command":"%s" } ] } ],%s\n' "$D" "$HK_CMD" "$R"
+  printf '    %s          "StopFailure": [ { "hooks": [ { "type":"command","command":"%s" } ] } ] }%s\n' "$D" "$HK_CMD" "$R"
+fi
 
-  Optional — ${B}instant "stopped" detection${R} (event-based, no time lag) via a Stop hook:
-    ${D}"hooks": {${R}
-    ${D}  "Stop":        [ { "hooks": [ { "type": "command", "command": "bash ${HOOK}" } ] } ],${R}
-    ${D}  "StopFailure": [ { "hooks": [ { "type": "command", "command": "bash ${HOOK}" } ] } ]${R}
-    ${D}}${R}
-  ${D}flags the watch stopped the moment a turn ends with no /jarvis wakeup pending.${R}
+cat <<EOF
 
   Personalize:
   ${D}·${R} .claude/skills/jarvis-once/persona.md   navigator's character & focus (ships empty)

@@ -238,24 +238,34 @@ switches to implementation **only when the human delegates** — "fix this for m
 ## Liveness — is it looping right now?
 
 `/loop` has no resident process, so between ticks nothing runs and it's easy to lose track of whether the watch is
-still alive. Jarvis signals it in two layers:
+still alive. Jarvis signals it in three layers:
 
 - **Tick heartbeat** — even on a quiet tick (no new change), it leaves one line: `⏱ jarvis · alive · next check ~4m (active) · strength=medium`.
 - **Status line** — every tick writes `.jarvis/status`, and a bundled script (`assets/statusline.sh`) renders the
-  watch state on every UI render — *between* ticks too. If the next wake time passes with no update, it even infers a stall:
+  watch state on every UI render — *between* ticks too. If the next wake time passes with no update, it infers a stall:
 
-```
-🤖 jarvis · watching · next ~3m (active)              # alive
-🤖 jarvis · ⚠ stalled? no tick for 11m — /loop /jarvis to resume
-```
+  ```
+  🤖 jarvis · watching · next ~3m (active)              # alive
+  🤖 jarvis · ⚠ stalled? no tick for 11m — /loop /jarvis to resume
+  ```
 
-Enable the status line yourself (install never touches your `settings.json`):
+- **Stop hook** — `/loop` has no event for an Esc-interrupt, so the status line can only *infer* a dead loop from a
+  stale timestamp (lagging by up to one interval). The bundled Stop hook (`assets/loop-watch-hook.sh`) closes most of
+  that gap: at every turn-end it checks whether a `/jarvis` wakeup is still scheduled and drops `.jarvis/stopped` the
+  moment one isn't — so the status line flips to "stopped" at your next interaction instead of waiting out the timer.
+
+**`install.sh` wires all three into `settings.json` for you** (global → `~/.claude/settings.json`, project →
+`.claude/settings.local.json`) — non-destructively (it never overwrites a `statusLine` you already have, and merges
+hooks/permissions without duplicates). Pass `--no-settings` to skip it and configure by hand:
 
 ```json
-{ "statusLine": { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/statusline.sh" } }
+{ "statusLine": { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/statusline.sh" },
+  "hooks": { "Stop":        [ { "hooks": [ { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/loop-watch-hook.sh" } ] } ],
+             "StopFailure": [ { "hooks": [ { "type": "command", "command": "bash ~/.claude/skills/jarvis/assets/loop-watch-hook.sh" } ] } ] } }
 ```
 
-It prints nothing when the watch isn't running, so it's safe to leave always on.
+The status line prints nothing when the watch isn't running, so it's safe to leave always on. (Hooks/statusLine load
+at session start — restart Claude Code after install.)
 
 ---
 
