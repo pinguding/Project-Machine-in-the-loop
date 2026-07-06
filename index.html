@@ -213,7 +213,8 @@
     <div class="demo" style="white-space:pre-wrap"><span class="tail">/loop /jarvis strength=high</span>      <span class="d"># check small changes often</span>
 <span class="tail">/loop /jarvis strength=low</span>       <span class="d"># only big chunks, rarely</span>
 <span class="tail">/loop /jarvis risk=**/*payment*</span>  <span class="d"># risk paths warn immediately, any size</span>
-<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># turn off the gray-zone mirror (on by default)</span></div>
+<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># turn off the gray-zone mirror (on by default)</span>
+<span class="tail">/loop /jarvis plan=PROJ-1234</span>     <span class="d"># opt into plan mode, based on that Jira ticket</span></div>
 
     <div class="three" style="margin-top:22px">
       <div class="col"><div class="big">Stop / pause</div><p>interrupt the loop (Esc)</p></div>
@@ -392,6 +393,9 @@
       <div class="feat"><span class="tag">MIRROR</span><span class="ic">🪞</span>
         <h3>Gray-zone mirror</h3>
         <p>When a large share of the accumulated changes is <b>generated code</b>, it reflects, in a single line, whether you've actually grasped it. It neither blocks nor fixes — just a mirror, so responsibility opens its eyes.</p></div>
+      <div class="feat"><span class="tag">PLAN</span><span class="ic">🗺</span>
+        <h3>Plan mode</h3>
+        <p>Optionally turn a source (Jira / Confluence / Notion / a doc / your own words) into a <b>plan + checklist you approve</b>, then every gated review checks your code <b>against the checklist</b> — what's missing per item, what's falsely "done." You author the plan and sequence the work; jarvis only drafts and recommends. Fully opt-in.</p></div>
     </div>
   </section>
 
@@ -416,6 +420,37 @@ which could lead to a crash — worth checking this path on empty input.
     </div>
   </section>
 
+  <!-- PLAN MODE -->
+  <section>
+    <div class="eyebrow">Plan Mode</div>
+    <h2>Navigate against a spec, not just code smells</h2>
+    <p class="lead">On the first <code>/loop /jarvis</code> — before the strength question — it asks
+      <b style="color:var(--txt)">"Draft a plan + checklist for this work?"</b> Say no and nothing changes.
+      Say yes, and every gated review checks your code against a checklist <b style="color:var(--txt)">you approved</b>.</p>
+
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <h3>Pick a source</h3>
+        <p>A Jira ticket, Confluence / Notion page, an existing doc — or write it in your own words. (Jira/Confluence needs the Atlassian MCP; otherwise it falls back to a doc path or direct dictation.)</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <h3>Approve the draft</h3>
+        <p><code>jarvis-plan</code> <b>drafts</b> a plan + a detailed checklist. You edit, resequence, cut, add — and approve. Only then are they written to <code>.jarvis/</code>.</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <h3>Watch against it</h3>
+        <p>Each gated review flags what's missing per item and any item you ticked that the code doesn't back up. Status line shows <code>· plan 3/7</code>. When all items look done, a final review — then it recommends closing; you confirm.</p>
+      </div></div>
+    </div>
+
+    <div class="note">
+      <b>You author the plan; jarvis only drafts it.</b> If the machine designed the work and you merely executed it,
+      the gray zone would just move upstream into the design — so the human edits and approves before anything hits disk.
+      <b>You own the checkmarks and the sequence:</b> jarvis reports what <i>looks</i> done and recommends a starting point,
+      but ticking items and deciding what's first stay with you. It flags a premature "done" — it never certifies one.
+    </div>
+  </section>
+
   <!-- ARGS -->
   <section>
     <div class="eyebrow">Configuration</div>
@@ -433,6 +468,7 @@ which could lead to a crash — worth checking this path on empty input.
       <tr><td><code>paths</code></td><td class="desc">Restrict the watched paths</td><td><span class="def">all</span></td></tr>
       <tr><td><code>focus</code></td><td class="desc">Focus-area directory — a set of docs viewed as a priority lens</td><td><span class="def">.claude/jarvis/focus/</span></td></tr>
       <tr><td><code>mirror</code></td><td class="desc">Gray-zone mirror — a one-line memo when generated code runs high (non-enforcing)</td><td><span class="def">on</span></td></tr>
+      <tr><td><code>plan</code></td><td class="desc">Plan mode — asks on first boot; <code>off</code> to skip, or a source (<code>plan=PROJ-1</code>, URL, path) to opt in directly</td><td><span class="def">ask on boot</span></td></tr>
     </table>
     <div class="note">
       💡 <b>Polling tightly doesn't add nagging.</b> Because Jarvis falls silent on its own below its own severity bar,

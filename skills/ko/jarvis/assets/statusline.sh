@@ -22,7 +22,7 @@ dir="$(printf '%s' "$input" | sed -n 's/.*"current_dir":"\([^"]*\)".*/\1/p' | he
 status="$dir/.jarvis/status"
 [ -f "$status" ] || exit 0   # 워치 미가동 → 상태줄에 아무것도 안 보탬
 
-state=; next_wake=; interval=; strength=; tick=
+state=; next_wake=; interval=; strength=; tick=; plan=
 while read -r line; do
   for kv in $line; do
     case "$kv" in
@@ -30,6 +30,7 @@ while read -r line; do
       next_wake=*) next_wake="${kv#*=}";;
       interval=*)  interval="${kv#*=}";;
       strength=*)  strength="${kv#*=}";;
+      plan=*)      plan="${kv#*=}";;
       tick=*)      tick="${kv#*=}";;
     esac
   done
@@ -47,6 +48,7 @@ hum(){
 
 icon='🤖'
 tail=""; [ -n "$strength" ] && tail=" · ${strength}"
+[ -n "$plan" ] && tail="${tail} · plan ${plan}"
 
 # 이벤트 기반 확정(우선): Stop 훅(loop-watch-hook.sh)이 /jarvis wake 소멸을 감지하면
 # .jarvis/stopped 를 남긴다. 이 플래그가 있으면 시간 추론을 건너뛰고 즉시 "멈춤"을 표시한다.

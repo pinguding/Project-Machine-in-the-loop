@@ -1,11 +1,11 @@
 ---
 name: jarvis-reset
-description: Deletes the jarvis watch's local state (.jarvis/baseline·args·status·stopped) for a full reset. The next /loop /jarvis starts from a first boot (banner, strength question). This does not stop the loop itself — it is an independent command that just clears the accrued tracking and saved strength. Use on requests like "reset jarvis", "jarvis reset", "clear the watch state", "start over".
+description: Deletes the jarvis watch's local state (.jarvis/baseline·args·status·stopped) for a full reset, and — after a confirmation — the plan/checklist (.jarvis/plan.md·checklist.md). The next /loop /jarvis starts from a first boot (banner, plan opt-in, strength question). This does not stop the loop itself — it is an independent command that just clears the accrued tracking and saved settings. Use on requests like "reset jarvis", "jarvis reset", "clear the watch state", "start over".
 ---
 
 # jarvis-reset
 
-**Resets the local state** of the `jarvis` watch. It deletes the state files in `.jarvis/` (`baseline`·`args`) to **discard all accrued change tracking and the saved strength.** The next time you launch `/loop /jarvis`, it starts fresh as if on a first boot (start banner + strength question).
+**Resets the local state** of the `jarvis` watch. It deletes the state files in `.jarvis/` (`baseline`·`args`) to **discard all accrued change tracking and the saved settings**, and — only after you confirm — the **plan/checklist** (`plan.md`·`checklist.md`). The next time you launch `/loop /jarvis`, it starts fresh as if on a first boot (start banner + plan opt-in + strength question).
 
 > ⚠️ **This is not a command to stop the loop.** To stop a running watch, interrupt the `/loop` itself (Esc). `jarvis-reset` is **independent** of that and only clears *state*. Use it when you want a clean restart after stopping.
 
@@ -15,7 +15,7 @@ description: Deletes the jarvis watch's local state (.jarvis/baseline·args·sta
 
 ## Procedure
 
-1. **Delete state files in bulk**:
+1. **Delete the watch state files in bulk** (per-tick, safe to always remove):
 
    ```bash
    rm -f .jarvis/baseline .jarvis/args .jarvis/status .jarvis/stopped .jarvis/paused
@@ -26,7 +26,12 @@ description: Deletes the jarvis watch's local state (.jarvis/baseline·args·sta
    - `.jarvis/paused` may be a leftover from an older version; delete it too (harmless if absent).
    - The `.jarvis/` directory itself may be left in place (there may be other caches). Even if empty, there is no need to delete it.
 
-2. **Report** (one line): `🧹 Jarvis state reset. To turn it back on, /loop /jarvis (starts fresh from the banner and strength question).`
+2. **Plan & checklist — confirm before deleting.** Unlike the one-line state files, `.jarvis/plan.md` and `.jarvis/checklist.md` are **durable work** the human authored/approved. If either exists, **ask first** (`AskUserQuestion` or a plain confirm): *"Also delete the plan and checklist? This can't be undone."*
+   - **Yes** → `rm -f .jarvis/plan.md .jarvis/checklist.md` (next start re-asks the plan opt-in).
+   - **No** → leave them; the next `/loop /jarvis` resumes plan mode against the existing checklist (baseline was cleared, so it re-measures from scratch, but the plan/checklist stay).
+   - If neither file exists, skip this step silently.
+
+3. **Report** (one line): `🧹 Jarvis state reset. To turn it back on, /loop /jarvis (starts fresh from the banner, plan opt-in, and strength question).`
 
 ## Natural-language triggers
 

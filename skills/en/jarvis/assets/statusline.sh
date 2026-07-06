@@ -23,7 +23,7 @@ dir="$(printf '%s' "$input" | sed -n 's/.*"current_dir":"\([^"]*\)".*/\1/p' | he
 status="$dir/.jarvis/status"
 [ -f "$status" ] || exit 0   # watch not running → contribute nothing
 
-state=; next_wake=; interval=; strength=; tick=
+state=; next_wake=; interval=; strength=; tick=; plan=
 while read -r line; do
   for kv in $line; do
     case "$kv" in
@@ -31,6 +31,7 @@ while read -r line; do
       next_wake=*) next_wake="${kv#*=}";;
       interval=*)  interval="${kv#*=}";;
       strength=*)  strength="${kv#*=}";;
+      plan=*)      plan="${kv#*=}";;
       tick=*)      tick="${kv#*=}";;
     esac
   done
@@ -48,6 +49,7 @@ hum(){
 
 icon='🤖'
 tail=""; [ -n "$strength" ] && tail=" · ${strength}"
+[ -n "$plan" ] && tail="${tail} · plan ${plan}"
 
 # Event-based confirmation (priority): the Stop hook (loop-watch-hook.sh) drops .jarvis/stopped
 # the moment the /jarvis wakeup is gone. If present, skip time inference and show "stopped" now.

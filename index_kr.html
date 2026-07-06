@@ -213,7 +213,8 @@
     <div class="demo" style="white-space:pre-wrap"><span class="tail">/loop /jarvis strength=high</span>      <span class="d"># 작은 변화도 자주 점검</span>
 <span class="tail">/loop /jarvis strength=low</span>       <span class="d"># 큰 덩어리만 드물게</span>
 <span class="tail">/loop /jarvis risk=**/*payment*</span>  <span class="d"># 위험 경로는 분량 무관 즉시 경고</span>
-<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># gray zone 거울 끄기 (기본 on)</span></div>
+<span class="tail">/loop /jarvis mirror=off</span>         <span class="d"># gray zone 거울 끄기 (기본 on)</span>
+<span class="tail">/loop /jarvis plan=PROJ-1234</span>     <span class="d"># 계획 모드 옵트인, 그 Jira 티켓 기반</span></div>
 
     <div class="three" style="margin-top:22px">
       <div class="col"><div class="big">멈춤 · 일시정지</div><p>루프 인터럽트(Esc)</p></div>
@@ -391,6 +392,9 @@
       <div class="feat"><span class="tag">MIRROR</span><span class="ic">🪞</span>
         <h3>gray zone 거울</h3>
         <p>누적 변경의 상당 부분이 <b>생성된 코드</b>면 "직접 파악했는지" 한 줄로 비춘다. 막지도 고치지도 않고 거울만 — 책임이 눈 뜨게.</p></div>
+      <div class="feat"><span class="tag">PLAN</span><span class="ic">🗺</span>
+        <h3>계획 모드</h3>
+        <p>선택적으로 소스(Jira / Confluence / Notion / 문서 / 직접 작성)를 <b>승인한 계획 + 체크리스트</b>로 만들면, 이후 게이트 리뷰마다 코드를 <b>체크리스트에 대고</b> 점검한다 — 항목별로 뭐가 빠졌나, 어떤 게 거짓 "완료"인가. 계획 저작과 순서는 사람이, jarvis는 초안·추천만. 완전 옵트인.</p></div>
     </div>
   </section>
 
@@ -415,6 +419,37 @@
     </div>
   </section>
 
+  <!-- PLAN MODE -->
+  <section>
+    <div class="eyebrow">계획 모드</div>
+    <h2>코드 냄새가 아니라 스펙을 기준으로</h2>
+    <p class="lead">첫 <code>/loop /jarvis</code>에서 — 강도 질문 앞에 —
+      <b style="color:var(--txt)">"이 작업의 계획 + 체크리스트를 만들까요?"</b>를 묻습니다. 아니오면 아무것도 바뀌지 않고,
+      예면 이후 게이트 리뷰마다 코드를 <b style="color:var(--txt)">당신이 승인한</b> 체크리스트에 대고 점검합니다.</p>
+
+    <div class="flow">
+      <div class="step"><div class="num">1</div><div class="body">
+        <h3>소스 고르기</h3>
+        <p>Jira 티켓, Confluence / Notion 페이지, 기존 문서 — 또는 직접 작성. (Jira/Confluence는 Atlassian MCP 필요; 없으면 문서 경로나 직접 불러주기로 폴백.)</p>
+      </div></div>
+      <div class="step"><div class="num">2</div><div class="body">
+        <h3>초안 승인</h3>
+        <p><code>jarvis-plan</code>이 계획 + 상세 체크리스트를 <b>초안</b>으로 잡습니다. 당신이 편집·재배열·덜기·더하기 하고 승인하면, 그때 <code>.jarvis/</code>에 기록됩니다.</p>
+      </div></div>
+      <div class="step"><div class="num">3</div><div class="body">
+        <h3>그것을 기준으로 감시</h3>
+        <p>게이트 리뷰마다 항목별로 뭐가 빠졌나, 체크했지만 코드가 뒷받침하지 않는 항목을 짚습니다. 상태줄에 <code>· plan 3/7</code>. 전 항목 완료로 보이면 최종 리뷰 — 그리고 종료를 추천하면 당신이 확정합니다.</p>
+      </div></div>
+    </div>
+
+    <div class="note">
+      <b>계획은 당신이 저작하고, jarvis는 초안만 잡습니다.</b> 기계가 작업을 설계하고 당신이 실행만 하면
+      gray zone이 설계 층으로 옮겨갈 뿐 — 그래서 디스크에 닿기 전에 사람이 편집·승인합니다.
+      <b>체크마크와 순서는 당신 것입니다:</b> jarvis는 무엇이 <i>완료로 보이는지</i> 보고하고 시작점을 추천할 뿐,
+      항목을 체크하고 무엇부터 할지는 당신이 정합니다. 설익은 "완료"는 짚어주되, 완료를 인증하진 않습니다.
+    </div>
+  </section>
+
   <!-- ARGS -->
   <section>
     <div class="eyebrow">설정</div>
@@ -432,6 +467,7 @@
       <tr><td><code>paths</code></td><td class="desc">감시 대상 경로 한정</td><td><span class="def">전체</span></td></tr>
       <tr><td><code>focus</code></td><td class="desc">집중 영역 디렉토리 — 우선 렌즈로 보는 문서 모음</td><td><span class="def">.claude/jarvis/focus/</span></td></tr>
       <tr><td><code>mirror</code></td><td class="desc">gray zone 거울 — 생성 코드 과다 시 한 줄 메모 (비강제)</td><td><span class="def">on</span></td></tr>
+      <tr><td><code>plan</code></td><td class="desc">계획 모드 — 첫 부팅에 질문; <code>off</code>로 건너뛰거나, 소스(<code>plan=PROJ-1</code>, URL, 경로)를 주면 곧장 옵트인</td><td><span class="def">부팅 시 질문</span></td></tr>
     </table>
     <div class="note">
       💡 폴링을 <b>촘촘히 해도 잔소리는 늘지 않습니다.</b> Jarvis는 자체 severity 문턱 아래선
