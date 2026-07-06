@@ -96,6 +96,7 @@ new change has accrued since the last review, a risk path changed, or a commit b
 | 🎭 | **Navigator personalization** | Fill in the empty `persona.md` to set **who** Jarvis is like and **what** it's sensitive to. |
 | 🔬 | **Focus area** | Drop "what to watch especially in this project" into `.claude/jarvis/focus/`, and it's seen as a **priority lens** ahead of the generic catalog. |
 | 🪞 | **gray-zone mirror** | When a large share of accrued change is **generated code**, it holds up one line — "did you actually grasp it?" It neither blocks nor fixes; just the mirror. |
+| 🗺 | **Plan mode** | On start, optionally turn a source (Jira / Confluence / Notion / a doc / your own words) into a **plan + checklist** you approve. Then every gated review checks your code **against the checklist** — what's missing per item, what's falsely "done." You sequence the work; jarvis only recommends a start. Fully opt-in. |
 
 ---
 
@@ -158,7 +159,8 @@ at session start — restart Claude Code after install.)
 |------|------|
 | **jarvis** | The entry-point watch loop. Launched as `/loop /jarvis`. Polls cheaply with `git diff`, and when new change accrues / a risk-path changes / a commit-boundary is crossed, calls `jarvis-once` and picks its next tick with `ScheduleWakeup`. |
 | **jarvis-once** | The single-shot pair navigator. Only reviews, flags, and suggests next steps — **never writes code directly.** |
-| **jarvis-reset** | Independent command that deletes the `.jarvis/` state (baseline & args) for a full reset. Does not stop a running loop (that's Esc); use it for a clean start afterward. |
+| **jarvis-plan** | The plan navigator. On opt-in, drafts a **plan + checklist** from a source (Jira/Confluence/Notion/doc/direct) for you to edit and approve, then writes them to `.jarvis/`. Drafts only — **you author and approve**; it never writes product code. |
+| **jarvis-reset** | Independent command that deletes the `.jarvis/` state (baseline & args, and — after a confirmation — the plan/checklist) for a full reset. Does not stop a running loop (that's Esc); use it for a clean start afterward. |
 
 State is stored in the working tree's `.jarvis/` (gitignored, an independent local state per clone). It avoids `.git/`
 because writing inside `.git/` prompts for permission every time — unfit for an unattended loop.
@@ -179,6 +181,32 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 
 ---
 
+## Plan mode — navigate against a spec, not just code smells
+
+Optionally, jarvis can watch your work **against a plan you approved** instead of only sniffing for generic bugs.
+
+On the first `/loop /jarvis`, it asks — *before* the strength question — **"Draft a plan + checklist for this work?"**
+
+- **No** → nothing changes; the watch behaves exactly as it always has.
+- **Yes** → the `jarvis-plan` navigator asks what to base it on — a **Jira ticket, Confluence/Notion page, an existing doc, or your own words** — reads the source, and **drafts** a `plan.md` plus a detailed `checklist.md`. You edit, resequence, cut, add — and **approve**. Only then are they written to `.jarvis/`.
+
+From there, every time the watch's gate fires, `jarvis-once` reviews your change **against the checklist**: which item it advances, what's missing per item (a happy path done but the error path isn't), and any item you ticked `- [x]` that the code doesn't actually back up. The status line shows progress (`· plan 3/7`). When every item looks complete, it runs a **comprehensive final review** and *recommends* closing the loop — you confirm.
+
+Two lines hold the philosophy in place:
+
+- **You author the plan; jarvis only drafts it.** If the machine designed the work and you merely executed it, the gray zone would just move upstream into the design. So the human edits and approves before anything hits disk — the same "propose, but the human pulls the trigger" as everywhere else.
+- **You own the checkmarks and the sequence.** jarvis reports what *looks* done and recommends a starting point; ticking items and deciding what to do first stay with you. It flags a premature "done" — it never certifies one.
+
+```
+/loop /jarvis                      # asks "make a plan?" then "strength?"
+/loop /jarvis plan=off             # skip the plan question entirely
+/loop /jarvis plan=PROJ-1234       # opt in and base it on that Jira ticket, no questions
+```
+
+> Reaching a source like Jira/Confluence needs the Atlassian MCP connected (Notion needs a Notion MCP). If it isn't, that choice falls back to "point me at a doc, or tell me the plan directly." Plan/checklist live in `.jarvis/` (gitignored, per-clone) — `/jarvis-reset` clears them only after a confirmation.
+
+---
+
 ## Configuration — tune with one line of args
 
 ```
@@ -196,6 +224,7 @@ Whatever you personalize, the core rules — **"no code production · neither sp
 | `paths` | Restrict the watched paths | all |
 | `focus` | Focus-area directory | `.claude/jarvis/focus/` |
 | `mirror` | gray-zone mirror (non-coercive) | `on` |
+| `plan` | plan mode — ask on first boot; `off` to skip, or a source (`plan=PROJ-1`, URL, path) to opt in directly | (ask on first boot) |
 
 > 💡 **Polling tightly doesn't add nagging.** Jarvis stays silent below its own severity bar, so tighter polling
 > only adds *call cost*, not noise. If you want faster response, raise the strength without worry.

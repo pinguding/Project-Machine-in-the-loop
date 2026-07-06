@@ -39,6 +39,7 @@ This skill must be launched as **`/loop /jarvis [args]`**. The engine of repetit
 | `risk` | **Risk path** glob — files matching this wake `jarvis-once` regardless of volume (even a single newly changed line). Comma-separate multiple. | (none/off) |
 | `focus` | **Focus area directory.** The `.md` collected here is viewed as a priority lens during review (see "Convention document collection" item 4). | `.claude/jarvis/focus/` |
 | `mirror` | **Mirror (gray-zone visualization).** If a substantial part of the cumulative changes is code *generated* in this session, point it out with a one-line memo on "whether you grasped it yourself" (non-enforcing). Turn off with `off`. See procedure 3.5 below. | `on` |
+| `plan` | **Plan mode.** On first boot, asks whether to draft a plan + checklist for this work (procedure 0.55). `off` skips the question (behaves exactly as today). A source (`plan=PROJ-123`, a URL, or a file path) opts in *and* names the source, skipping both questions. Once a plan exists (`.jarvis/checklist.md` present), the watch reviews against it every gated tick. | (ask on first boot) |
 
 > **The commit-boundary trigger is always on, independent of args.** When a new commit is detected, `jarvis-once` runs once on that commit's changes regardless of accrued volume. This is because right before/after a mistake is sealed into code is the golden time for a warning. (manifesto: "AI actively warns about human mistakes")
 
@@ -103,6 +104,8 @@ The watch's progress is controlled by the 2 files below. Both are under `.jarvis
 | `.jarvis/args` | The effective args string of the previous tick (e.g., `strength=medium`). Updated every tick. If the next start is invoked **with no args**, jarvis reads this value and auto-resumes with the same settings (procedure 0.4). Default (medium) if absent. | written every tick / deleted by `/jarvis-reset` |
 | `.jarvis/status` | **A one-line liveness state** (see "Liveness" below). At the end of every tick it records the next wake time (`next_wake` epoch), interval, and strength. The statusline script reads this file to continuously show "watching / stalled?" **between** ticks. | written every tick / deleted by `/jarvis-reset` |
 | `.jarvis/stopped` | **An event-based "stopped" flag** (see "Liveness (C)"). The Stop hook (`assets/loop-watch-hook.sh`) drops it when a turn ends with no `/jarvis` wakeup pending. If present, the statusline shows "stopped" **instantly** with no time inference; the hook clears it while a wakeup is alive. | written/cleared by the Stop hook / deleted by `/jarvis-reset` |
+| `.jarvis/plan.md` | **The approved plan document** (goal / scope / approach / open questions). Written once by `jarvis-plan` after the human approves. Its presence + `checklist.md` means **plan mode is active.** Durable (not a per-tick one-liner). | written by `jarvis-plan` on opt-in / deleted by `/jarvis-reset` (with confirmation) |
+| `.jarvis/checklist.md` | **The work checklist** — markdown `- [ ]`/`- [x]` items. **The human owns the checkmarks**; the watch reads it each gated review to know what's officially done and re-assesses the rest. Progress = ticked/total. Its presence is what the watch keys "plan mode active" on. | created by `jarvis-plan`, ticked by the human / deleted by `/jarvis-reset` (with confirmation) |
 
 > **Lifecycle (on top of `/loop`):** Start/resume is `/loop /jarvis` — if baseline/args remain, it continues from that state. Stop/pause is interrupting the `/loop` itself (Esc) — no next wake gets scheduled so the loop ends, and baseline/args stay on disk waiting to resume. Full reset is **`/jarvis-reset`** (an independent skill: delete baseline/args → next start is a first boot). Loop termination has no teardown hook, so state cleanup only happens at start time (self-correction) and via `/jarvis-reset`. (The old `.jarvis/paused` flag and `/jarvis-pause`·`/jarvis-resume`·`/jarvis-stop` are no longer used.)
 
@@ -121,6 +124,7 @@ git diff --name-only <base_head>..<cur_head>   # when woken by the commit bounda
 
 Based on those paths, collect the following (only what exists, and **do not re-read if already in context**):
 
+0. **Task plan & checklist (only when plan mode is active — `.jarvis/checklist.md` exists)** — read `.jarvis/plan.md` and `.jarvis/checklist.md` and pass them to `jarvis-once` as the **"task spec" (highest priority)**. This is what the change is *supposed* to accomplish, so it outranks even the focus area: jarvis-once reviews the change against the checklist (which items it advances, whether they look complete, what's missing or risky per item). See procedure 3.6.
 1. **Nearest `AGENTS.md`** — going up from each changed file's directory, the first `AGENTS.md` encountered. (e.g., a change in `packages/billing/**` → `packages/billing/AGENTS.md`)
 2. **Directory `README.md`** — if the directory containing the changed file has a `README.md`, that file.
 3. **`.claude/rules/**` rule documents corresponding to the changed files** — pick out only the rules matching the changed files' kind/path (not all of them) to reference. No matter what axis the project organized `.claude/rules/` along (per-language, per-layer, per-feature, per-directory), choose only the 1–3 most relevant to the changed files. Rule file/directory names are themselves application hints (e.g., if you changed a UI file, `ui`/`view` kinds; if you changed tests, `test` kinds; if you changed payments, `payment`/`billing` kinds). Don't rely on a hardcoded per-language mapping — **discover them from the rule files the project actually has.** Skip rules already auto-injected.
@@ -128,7 +132,7 @@ Based on those paths, collect the following (only what exists, and **do not re-r
 
 Avoid duplication/over-collection: if several changed files share the same `AGENTS.md`, read it only once. If the collection volume is excessive, limit it to the 1–2 top directories with the most changed files.
 
-Pass the collected content along when calling `jarvis-once` — distinguish 1–3 as **"reference conventions"** and 4 as **"focus area (priority)."** (The persona (`persona.md`) is read directly by `jarvis-once` from its own directory, so the watch does not collect it.)
+Pass the collected content along when calling `jarvis-once` — distinguish 0 as the **"task spec (highest priority)"**, 1–3 as **"reference conventions"**, and 4 as **"focus area (priority)."** (The persona (`persona.md`) is read directly by `jarvis-once` from its own directory, so the watch does not collect it.)
 
 ## Jarvis output markers (required)
 
@@ -191,6 +195,17 @@ cat .jarvis/args 2>/dev/null || true
 
 ### 0.5. Start banner (once on first boot)
 If the `.jarvis/baseline` file **does not exist**, this is the first startup tick → output the `JARVIS` ASCII logo **once in a response-body code fence** per the "Start banner" section rules (outside markers, with caption, always visible). Skip if the file already exists. After outputting the banner, proceed normally with procedures 1–4.
+
+### 0.55. Plan opt-in (only once, on first boot + interactive)
+**Condition:** Perform only when this is the first startup tick (baseline-absent decision at `0.5`) **and this is an interactive start, not a scheduled auto-wake.** Same guard as strength (0.6): **never ask on an auto-firing tick** — a question there would block the loop while the user is away.
+
+- **`plan=off`** → skip planning entirely. The loop behaves **exactly as it does without this feature** (as-is). No plan/checklist files, no plan-review.
+- **`plan=<source>`** (a Jira key, URL, or file path) → treated as opt-in *with* the source named. Hand it straight to `jarvis-plan` (skip the yes/no question).
+- **Otherwise, ask once** with `AskUserQuestion`: *"Draft a plan + checklist for this work?"* — choices **"Yes, make a plan"** / **"No, just watch."**
+  - **No** → proceed as-is (no planning). Nothing more to do here.
+  - **Yes** → call `Skill('jarvis-plan')`. It selects the source (Jira / Confluence / Notion / doc / write directly), reads it, **drafts** `plan.md` + `checklist.md`, gets the human's **approval**, and writes them to `.jarvis/`. When it returns, continue to 0.6.
+- **Order:** this comes **before** strength (0.6) — decide *what the work is* before *how tightly to watch it.*
+- **First boot only.** On resume (baseline present) it is not re-asked; if `.jarvis/checklist.md` exists, plan mode is simply active and the watch reviews against it. To (re)plan later: `/jarvis-reset` then start again, or `/loop /jarvis plan=<source>`.
 
 ### 0.6. Strength selection (only once, on first boot + when no args)
 **Condition:** Perform only when this is the first startup tick (baseline-absent decision at `0.5`) and **there are no recognized args at all.**
@@ -328,6 +343,28 @@ An auxiliary device for preserving authorship. **It neither blocks nor fixes cod
 - **Only within the visible scope.** It looks only at this session's transcript — it cannot see generation in another terminal/session or external pastes. So it does not assert ("it is...") but points out with "looks like...," and does not interrogate.
 - To turn it off, `mirror=off`. If the human doesn't want the mirror, respect that choice too — even the mirror is non-enforcing. (Litmus ①: coercion is Ultron, the mirror is Jarvis)
 
+### 3.6. Plan review & completion (only when plan mode is active)
+Skip this entire procedure unless `.jarvis/checklist.md` exists. When it does, the checklist is the spec the watch navigates against.
+
+**Per-review checklist assessment (rides on the gate — no extra cost):** This runs only on ticks where a review was actually flushed (procedure 3's execute branch or a commit-boundary review 2a) — the same expensive moments, not every tick. When `jarvis-once` is called, the plan/checklist was already passed as the "task spec" (collection item 0). Have it, alongside the normal review, report against the checklist:
+- which item(s) this change advances, and which now **look complete**;
+- what's **missing or risky per item** (an item whose happy path is done but error/empty paths aren't);
+- **false completion** — if the human already ticked an item (`- [x]`) but the code doesn't back it up, flag that (the navigator's job is to contradict a premature "done," not to rubber-stamp it).
+- This assessment goes **inside the Jarvis markers** as part of the review body.
+
+**The human owns the checkmarks.** The watch does **not** tick `- [ ]` → `- [x]` on its own — that judgment (and the accountability that rides on it) stays with the human. The watch only *reports* its assessment; the human ticks items in `.jarvis/checklist.md` when they agree. (Reading the file each review tells the watch what's officially done vs. still open.)
+
+**Which to do first is the human's call.** If asked, recommend a next item and one line of why — then step back. Never sequence the work for them.
+
+**Completion → final review, then recommend closing (the human confirms):** When **every checklist item appears complete** (all boxes ticked, or all assessed done with no open gaps), on that tick have `jarvis-once` do a **comprehensive final review against the whole plan** — the "right before it's all sealed" golden moment at the largest scale. Deliver it wrapped in the markers, then leave a one-line recommendation **outside** the markers:
+
+```
+✅ All checklist items look complete — final review above. Close the loop? (Esc to stop · or say "done" / keep going)
+```
+
+- Do **not** end the loop yourself on this tick — **still schedule the next wake** (procedure 4) so the watch stays alive while the human decides. Ending the loop is the human's act: they confirm ("done") or simply interrupt (Esc), and then no further wake is scheduled. (Consistent with "the human pulls every trigger.")
+- If the human keeps editing after completion was signalled, the loop just carries on reviewing — nothing special is needed.
+
 ### 4. Schedule the next wake (the core of loop maintenance)
 Call `ScheduleWakeup` to schedule the next run.
 
@@ -354,11 +391,16 @@ Call `ScheduleWakeup` to schedule the next run.
   ```bash
   mkdir -p .jarvis
   now=$(date +%s)
-  echo "state=watching next_wake=$((now + <delay_s>)) interval=<interval> strength=<strength> tick=$now" > .jarvis/status
+  plan=""   # plan mode: append checklist progress so the statusline can show it
+  if [ -f .jarvis/checklist.md ]; then
+    done=$(grep -cE '^[[:space:]]*-[[:space:]]*\[[xX]\]' .jarvis/checklist.md); total=$(grep -cE '^[[:space:]]*-[[:space:]]*\[[ xX]\]' .jarvis/checklist.md)
+    plan=" plan=${done}/${total}"
+  fi
+  echo "state=watching next_wake=$((now + <delay_s>)) interval=<interval> strength=<strength>${plan} tick=$now" > .jarvis/status
   rm -f .jarvis/stopped   # a tick running = loop alive → clear the event stopped flag (if any)
   ```
 
-  This one line is what backs the statusline's continuous display (watching / stalled?) and stall inference (see "Liveness"). Omit it and the statusline sees only a stale `next_wake` and soon shows "stalled?".
+  This one line is what backs the statusline's continuous display (watching / stalled?) and stall inference (see "Liveness"). Omit it and the statusline sees only a stale `next_wake` and soon shows "stalled?". The `plan=<done>/<total>` field is optional — present only in plan mode, and the statusline renders it as a `· plan 3/7` segment.
 
 ## Liveness (heartbeat + statusline)
 
@@ -427,7 +469,7 @@ Since `/loop` is the engine, the lifecycle rides on `/loop`'s own lifecycle. The
 |------|------|------------------|
 | **Start · resume** | `/loop /jarvis [args]` | if baseline/args remain, continue from that point. Launched with no args, `.jarvis/args` auto-restores (procedure 0.4) |
 | **Stop · pause** | interrupt the `/loop` (Esc) | untouched — baseline/args preserved, waiting to resume |
-| **Full reset** | **`/jarvis-reset`** (independent skill) | delete `.jarvis/baseline`·`.jarvis/args` → next start is a first boot (banner/strength question) |
+| **Full reset** | **`/jarvis-reset`** (independent skill) | delete `.jarvis/baseline`·`.jarvis/args` (and `plan.md`·`checklist.md`, after a confirmation) → next start is a first boot (banner / plan opt-in / strength question) |
 
 How it works:
 - **Light yielding (implicit)**: If the user simply sends another message, that turn yields to discussion/implementation per procedure 0 (the watch itself stays alive). An implicit yielding that happens without a command.
@@ -445,4 +487,4 @@ How it works:
 
 ## Dependency note
 
-This skill calls the `jarvis-once` (one-shot navigator) skill. To share with the team, `jarvis-once` must also be accessible (repo `.claude/skills/jarvis-once/` or a shared repo). If it is only in the personal global (`~/.claude/skills/jarvis-once/`), the call may fail in other teammates' environments.
+This skill calls the `jarvis-once` (one-shot navigator) skill, and on plan opt-in the `jarvis-plan` (plan navigator) skill. To share with the team, both must also be accessible (repo `.claude/skills/jarvis-once/`·`jarvis-plan/` or a shared repo). If they are only in the personal global (`~/.claude/skills/…`), the call may fail in other teammates' environments.

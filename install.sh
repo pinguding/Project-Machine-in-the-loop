@@ -19,7 +19,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/pinguding/Project-Machine-in-the-loop.git"
-SKILLS=(jarvis jarvis-once jarvis-reset)
+SKILLS=(jarvis jarvis-once jarvis-plan jarvis-reset)
 
 # ---- colors ----
 if [ -t 1 ]; then B=$'\033[1m'; G=$'\033[32m'; C=$'\033[36m'; Y=$'\033[33m'; D=$'\033[2m'; R=$'\033[0m'; else B=; G=; C=; Y=; D=; R=; fi

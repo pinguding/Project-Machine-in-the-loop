@@ -196,6 +196,44 @@ else
   echo "  ⚠ loop-watch-hook.sh 없음 — 스킵 ($HK)"
 fi
 
+echo "▸ 13. 계획 모드 — checklist.md 감지 + 진행률 카운트 + statusline plan 구획"
+# SKILL 절차 4가 쓰는 진행률 카운트(POSIX 클래스, macOS BSD grep 호환)와
+# checklist.md 존재 = 계획 모드 활성 판정, statusline의 `· plan N/M` 렌더링을 본다.
+mkdir -p .jarvis
+# (a) checklist 없음 → 계획 모드 비활성
+plan_active=$([ -f .jarvis/checklist.md ] && echo 1 || echo 0)
+ok "$plan_active" 0 "checklist 없음 → 계획 모드 비활성"
+# (b) checklist 생성 → 진행률 카운트 (done/total)
+cat > .jarvis/checklist.md <<'CL'
+# Checklist — demo
+## phase 1
+- [x] done item
+- [X] also done
+- [ ] ▶ not yet
+  - [ ] indented sub
+## phase 2
+- [ ] another
+CL
+count_done(){ grep -cE '^[[:space:]]*-[[:space:]]*\[[xX]\]' .jarvis/checklist.md; }
+count_total(){ grep -cE '^[[:space:]]*-[[:space:]]*\[[ xX]\]' .jarvis/checklist.md; }
+plan_active=$([ -f .jarvis/checklist.md ] && echo 1 || echo 0)
+ok "$plan_active" 1 "checklist 존재 → 계획 모드 활성"
+ok "$(count_done)"  2 "완료 항목 카운트([x]/[X])"
+ok "$(count_total)" 5 "전체 항목 카운트([ ]/[x])"
+# (c) statusline이 plan 필드를 `· plan N/M` 로 렌더
+if [ -f "$SL" ]; then
+  now=$(date +%s)
+  printf 'state=watching next_wake=%s interval=active strength=medium plan=2/5 tick=%s\n' "$((now+180))" "$now" > .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'plan 2/5' "$out")" 1 "statusline → · plan 2/5 표기"
+  # (d) plan 필드 없음 → plan 구획 미표기
+  printf 'state=watching next_wake=%s interval=active strength=medium tick=%s\n' "$((now+180))" "$now" > .jarvis/status
+  out="$(printf '{"workspace":{"current_dir":"%s"}}' "$SANDBOX" | bash "$SL")"
+  ok "$(contains 'plan' "$out")" 0 "plan 필드 없음 → plan 구획 없음"
+  rm -f .jarvis/status
+fi
+rm -f .jarvis/checklist.md
+
 echo ""
 echo "════════════════════════════════════"
 echo "  PASS=$PASS  FAIL=$FAIL"
